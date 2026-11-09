@@ -11,14 +11,17 @@ local i18n = {}
 i18n.currentLanguage = "ru"
 i18n.uiDict = {}
 i18n.gameDict = {}
+i18n.uiPatterns = {}
 i18n.templates = {}
 i18n.memo = {}
+i18n.isHooked = false
 
 -- Load dictionaries safely
 function i18n.init(gameVersion)
     local uiOk, uiTable = pcall(require, "i18n.dictionaries.ui_ru")
     if uiOk and type(uiTable) == "table" then
         i18n.uiDict = uiTable
+        i18n.uiPatterns = uiTable.patterns or {}
     end
 
     local tmplOk, tmplTable = pcall(require, "i18n.dictionaries.affix_templates")
@@ -48,18 +51,46 @@ end
 
 -- Core single-token translation lookup
 local function lookupToken(token)
+    if not token or #token == 0 or token == "patterns" then
+        return nil
+    end
     local trans = i18n.uiDict[token]
-    if trans then
+    if trans and type(trans) == "string" then
         return trans
     end
     trans = i18n.gameDict[token]
-    if trans then
+    if trans and type(trans) == "string" then
         return trans
     end
     return nil
 end
 
--- Pattern-based numerical affix and stat matching
+-- Extract all consecutive leading PoB color escape codes: ^0..^9, ^xRRGGBB
+local function extractLeadingColor(str)
+    local len = #str
+    local pos = 1
+    while pos <= len do
+        if str:byte(pos) == 94 then -- '^'
+            local b2 = str:byte(pos + 1)
+            if b2 and b2 >= 48 and b2 <= 57 then -- '0'..'9'
+                pos = pos + 2
+            elseif b2 and (b2 == 120 or b2 == 88) and pos + 7 <= len and str:sub(pos + 2, pos + 7):find("^%x%x%x%x%x%x") then -- 'x' or 'X' + 6 hex
+                pos = pos + 8
+            else
+                break
+            end
+        else
+            break
+        end
+    end
+    if pos > 1 then
+        return str:sub(1, pos - 1), str:sub(pos)
+    else
+        return "", str
+    end
+end
+
+-- Numerical template matching for complex item affixes ({0}, {1}, etc.)
 local function tryMatchTemplate(text)
     if not text:find("%d") then
         return nil
@@ -68,8 +99,6 @@ local function tryMatchTemplate(text)
     local nums = {}
     local idx = 0
 
-    -- Extract numbers and replace with {0}, {1}, etc.
-    -- Keeps sign (+/-) outside placeholder if present
     local pattern = text:lower()
     pattern = pattern:gsub("([%+%-]?)(%d+%.?%d*)", function(sign, num)
         local ph = (sign or "") .. "{" .. idx .. "}"
@@ -97,65 +126,117 @@ local function tryMatchTemplate(text)
     return nil
 end
 
--- Translate single line handling color escapes, prefixes, and suffixes
-local function translateLine(line)
+-- Multi-step translation pipeline forward declaration
+local translateLine
+
+local function translateToken(token)
+    if not token or #token == 0 then
+        return token
+    end
+
+    -- 1. Exact dictionary match (uiDict, then gameDict)
+    local direct = lookupToken(token)
+    if direct then
+        return direct
+    end
+
+    -- 2. Trailing colon or punctuation ("Label:" -> "Метка:")
+    local base, punct = token:match("^(.-)([:%.%s]+)$")
+    if base and #base > 0 and punct then
+        local tBase = lookupToken(base)
+        if tBase then
+            return tBase .. punct
+        end
+    end
+
+    -- 3. Stat comparison lines in tooltips:
+    -- e.g. "+12.5% Total DPS (+12.5%) ^8[+12.5% per point]" or "+15 Life ^8[+15 per point]"
+    local num, after = token:match("^([%+%-]?%d+%.?%d*%%?)%s+(.+)$")
+    if num and after then
+        local mainPart, perPt = after:match("^(.-)%s*(%^8%[[^%]]+ per point%]%s*)$")
+        if perPt then
+            after = mainPart
+            perPt = perPt:gsub("per point", "за очко")
+        end
+        local statPart, deltaPct = after:match("^(.-)%s*(%(%s*[%+%-]?%d+%.?%d*%%%s*%))$")
+        if deltaPct then
+            after = statPart
+        end
+        local tStat = lookupToken(after)
+        if not tStat and i18n.uiPatterns then
+            for _, pat in ipairs(i18n.uiPatterns) do
+                local matched, count = after:gsub(pat.pattern, pat.repl)
+                if count > 0 then
+                    tStat = matched
+                    break
+                end
+            end
+        end
+        if tStat then
+            return num .. " " .. tStat .. (deltaPct and (" " .. deltaPct) or "") .. (perPt and (" " .. perPt) or "")
+        end
+    end
+
+    -- 4. "Key: Value" pair where Key and Value are translated individually
+    -- e.g. "Socketed in: Weapon 1" or "Main Skill: Fireball"
+    local key, sep, val = token:match("^(.-)(:%s+)(.+)$")
+    if key and #key > 0 and val and #val > 0 then
+        local tKey = lookupToken(key)
+        if tKey then
+            local tVal = translateLine(val)
+            return tKey .. sep .. tVal
+        end
+    end
+
+    -- 5. "Text (Subtext)" where Text and Subtext are translated individually
+    -- e.g. "Unnamed build (Ranger)" or "Level: 20 (Max)"
+    local mainText, sub = token:match("^(.-)%s+%((.-)%)$")
+    if mainText and sub and #mainText > 0 and #sub > 0 then
+        local tMain = translateToken(mainText)
+        local tSub = translateToken(sub)
+        if tMain ~= mainText or tSub ~= sub then
+            return tMain .. " (" .. tSub .. ")"
+        end
+    end
+
+    -- 6. UI regex patterns (tooltips, requirements, counters)
+    if i18n.uiPatterns then
+        for _, pat in ipairs(i18n.uiPatterns) do
+            local matched, count = token:gsub(pat.pattern, pat.repl)
+            if count > 0 then
+                return matched
+            end
+        end
+    end
+
+    -- 7. Numerical affix templates
+    local templated = tryMatchTemplate(token)
+    if templated then
+        return templated
+    end
+
+    return token
+end
+
+function translateLine(line)
     if not line or #line == 0 then
         return line
     end
 
-    local prefix = ""
-    local rest = line
-
-    -- Check for leading color code: ^0..^9 or ^xRRGGBB
-    if rest:sub(1, 1) == "^" then
-        local second = rest:sub(2, 2)
-        if second >= "0" and second <= "9" then
-            prefix = rest:sub(1, 2)
-            rest = rest:sub(3)
-        elseif second == "x" and #rest >= 8 then
-            prefix = rest:sub(1, 8)
-            rest = rest:sub(9)
-        end
+    -- Extract leading color codes (e.g. ^7, ^xRRGGBB)
+    local colorPrefix, rest = extractLeadingColor(line)
+    if #rest == 0 then
+        return line
     end
 
-    -- Check for specific known prefixes (e.g., "Current build: ")
-    local customPrefix = ""
-    if rest:sub(1, 15) == "Current build: " then
-        customPrefix = "Текущий билд: "
-        rest = rest:sub(16)
-    elseif rest:sub(1, 9) == "Version: " then
-        customPrefix = "Версия: "
-        rest = rest:sub(10)
-    elseif rest:sub(1, 14) == "Game Version: " then
-        customPrefix = "Версия игры: "
-        rest = rest:sub(15)
+    -- Preserve leading and trailing whitespace
+    local leadingSpaces, content, trailingSpaces = rest:match("^(%s*)(.-)(%s*)$")
+    if #content == 0 then
+        return line
     end
 
-    -- Check for trailing colon (common in UI labels like "Life:" or "Total DPS:")
-    local suffix = ""
-    if rest:sub(-1) == ":" then
-        suffix = ":"
-        rest = rest:sub(1, -2)
-    end
-
-    -- 1. Direct dictionary match
-    local translated = lookupToken(rest)
-    if translated then
-        return prefix .. customPrefix .. translated .. suffix
-    end
-
-    -- 2. Try numerical template matching
-    local templated = tryMatchTemplate(rest)
-    if templated then
-        return prefix .. customPrefix .. templated .. suffix
-    end
-
-    -- If no match, return original line with custom prefix if matched
-    if #customPrefix > 0 then
-        return prefix .. customPrefix .. rest .. suffix
-    end
-
-    return line
+    local translated = translateToken(content)
+    return colorPrefix .. leadingSpaces .. translated .. trailingSpaces
 end
 
 function i18n.translate(text)
