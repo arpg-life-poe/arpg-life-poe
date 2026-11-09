@@ -270,9 +270,10 @@ struct FontImpl {
         bool isBold = (name.find("Bold") != std::string::npos || name.find("BOLD") != std::string::npos);
         for (auto& fh : heights) {
             CFStringRef primaryName = isBold ? CFSTR("Helvetica-Bold") : CFSTR("Helvetica");
-            CTFontRef base = CTFontCreateWithName(primaryName, static_cast<CGFloat>(fh->height), NULL);
+            const CGFloat fontSize = std::max<CGFloat>(8.0, static_cast<CGFloat>(fh->height) * 0.76);
+            CTFontRef base = CTFontCreateWithName(primaryName, fontSize, NULL);
             if (!base) {
-                base = CTFontCreateUIFontForLanguage(kCTFontUIFontSystem, static_cast<CGFloat>(fh->height), CFSTR("ru"));
+                base = CTFontCreateUIFontForLanguage(kCTFontUIFontSystem, fontSize, CFSTR("ru"));
             }
             if (base) {
                 fh->ctFont = CTFontCreateForString(base, CFSTR("А"), CFRangeMake(0, 1));
@@ -552,7 +553,8 @@ struct FontImpl {
         if (dg.texture && dg.pixelWidth > 0 && dg.pixelHeight > 0) {
             const float w = static_cast<float>(dg.pixelWidth) * scale;
             const float h = static_cast<float>(dg.pixelHeight) * scale;
-            SDL_FRect dest{x, y, w, h};
+            const float yOffset = (static_cast<float>(drawHeight) - h) * 0.5f;
+            SDL_FRect dest{x, y + yOffset, w, h};
             SDL_SetTextureColorModFloat(dg.texture, color.r, color.g, color.b);
             SDL_SetTextureAlphaModFloat(dg.texture, color.a);
             SDL_RenderTexture(renderer, dg.texture, nullptr, &dest);

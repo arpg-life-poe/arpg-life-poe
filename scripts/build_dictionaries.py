@@ -9,6 +9,7 @@
 
 import json
 import os
+import re
 import sys
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -55,25 +56,187 @@ def write_lua_table(path, table_name, data):
         f.write(f"return {table_name}\n")
 
 # ------------------------------------------------------------------------------
-# 1. UI Dictionary
+# 1. UI Dictionary (Optimized widths to avoid button/panel overflows)
 # ------------------------------------------------------------------------------
 UI_TRANSLATIONS = {
-    # Main Navigation Tabs
+    # Top Bar Left Controls
+    "<< Back": "<< Назад",
+    "Back": "Назад",
+    "Save": "Сохр.",
+    "Save As": "Сохр. как",
+    "Save As...": "Сохр. как...",
+    "Current build: ": "Текущий билд: ",
+
+    # Bottom Bar Controls
+    "Options": "Опции",
+    "About": "Инфо",
+    "Update Ready": "Обновление готово",
+    "Check for Update": "Проверить обновления",
+
+    # Left Sidebar Tabs
     "Tree": "Дерево",
     "Skills": "Умения",
     "Items": "Предметы",
     "Calcs": "Расчеты",
-    "Configuration": "Конфигурация",
+    "Configuration": "Конфиг",
+    "Config": "Конфиг",
     "Notes": "Заметки",
     "Import/Export Build": "Импорт/Экспорт",
-    "Options": "Настройки",
-    "About": "О программе",
     "Party": "Группа",
+    "Compare": "Сравнить",
 
-    # Common Buttons & Actions
-    "Back": "Назад",
-    "Save": "Сохранить",
-    "Save As...": "Сохранить как...",
+    # Tree Tab Controls
+    "Compare:": "Сравнить:",
+    "Reset Tree": "Сброс",
+    "Passive Skill Tree": "Дерево пассивных умений",
+    "Points Used": "Потрачено очков",
+    "Points: ": "Очки: ",
+    "Ascendancy Points Used": "Очков восхождения",
+    "Search Tree": "Поиск по дереву",
+    "Show Node Power": "Сила нодов",
+    "Game Version: ": "Версия игры: ",
+    "Warning: resetting your passive tree cannot be undone.": "Внимание: сброс дерева пассивок нельзя отменить.",
+
+    # Skills Tab & Controls
+    "Main Skill:": "Главное умение:",
+    "Main Skill: ": "Главное умение: ",
+    "Manage Spectres...": "Призраки...",
+    "Manage Beasts...": "Звери...",
+    "Socket Groups": "Группы гнезд",
+    "Enabled": "Включено",
+    "Include in Full DPS": "Включить в полный ДПС",
+    "Gem Level": "Уровень камня",
+    "Gem Quality": "Качество камня",
+    "Skill Gems": "Камни умений",
+
+    # Left Sidebar Compact Stats (strictly <= 170px width)
+    "Average Damage: ": "Ср. урон: ",
+    "Effective Crit Chance: ": "Эфф. крит: ",
+    "Crit Multiplier: ": "Множ. крита: ",
+    "Effective Hit Pool: ": "Эфф. HP (EHP): ",
+    "Maximum Hit Taken: ": "Макс. удар: ",
+    "Fire Resistance: ": "Сопр. огню: ",
+    "Cold Resistance: ": "Сопр. холоду: ",
+    "Lightning Resistance: ": "Сопр. молнии: ",
+    "Chaos Resistance: ": "Сопр. хаосу: ",
+    "Phys. Damage Reduction: ": "Физ. защита: ",
+    "Spell Suppression Chance: ": "Подавл. чар: ",
+    "Spell Block Chance: ": "Блок чар: ",
+    "Block Chance: ": "Блок атак: ",
+    "Movement Speed: ": "Скор. бега: ",
+    "Attack Rate: ": "Скор. атаки: ",
+    "Cast Rate: ": "Скор. чар: ",
+    "Hit Chance: ": "Шанс попад.: ",
+    "Total DPS: ": "Общий ДПС: ",
+    "Hit DPS: ": "ДПС удара: ",
+    "Dot DPS: ": "ДПС DOT: ",
+    "Damage over Time: ": "Урон со врем.: ",
+    "Bleed DPS: ": "ДПС кровот.: ",
+    "Ignite DPS: ": "ДПС поджога: ",
+    "Poison DPS: ": "ДПС яда: ",
+    "Life: ": "Здоровье: ",
+    "Mana: ": "Мана: ",
+    "Energy Shield: ": "Эн. щит: ",
+    "Ward: ": "Оберег: ",
+    "Armour: ": "Броня: ",
+    "Evasion: ": "Уклонение: ",
+    "Evasion Rating: ": "Уклонение: ",
+    "Spirit: ": "Дух: ",
+    "MH Crit Multiplier: ": "Множ. крита осн.: ",
+    "OH Crit Multiplier: ": "Множ. крита втор.: ",
+    "MH Hit Chance: ": "Шанс попад. осн.: ",
+    "OH Hit Chance: ": "Шанс попад. втор.: ",
+    "MH Attack Rate: ": "Скор. атаки осн.: ",
+    "OH Attack Rate: ": "Скор. атаки втор.: ",
+
+    # Non-colon Stat Names
+    "Average Damage": "Средний урон",
+    "Effective Crit Chance": "Эффективный крит",
+    "Crit Multiplier": "Множитель крита",
+    "Effective Hit Pool": "Эффективный запас здоровья (EHP)",
+    "Fire Resistance": "Сопротивление огню",
+    "Cold Resistance": "Сопротивление холоду",
+    "Lightning Resistance": "Сопротивление молнии",
+    "Chaos Resistance": "Сопротивление хаосу",
+    "Phys. Damage Reduction": "Снижение физ. урона",
+    "Spell Suppression Chance": "Шанс подавления чар",
+    "Total DPS": "Общий ДПС",
+    "Hit DPS": "ДПС удара",
+    "Damage over Time": "Урон со временем",
+    "Life": "Здоровье",
+    "Mana": "Мана",
+    "Energy Shield": "Энергетический щит",
+    "Ward": "Оберег",
+    "Armour": "Броня",
+    "Evasion": "Уклонение",
+    "Spirit": "Дух",
+    "Strength": "Сила",
+    "Dexterity": "Ловкость",
+    "Intelligence": "Интеллект",
+    "Req Str": "Треб. силы",
+    "Req Dex": "Треб. ловкости",
+    "Req Int": "Треб. инт.",
+
+    # Classes (PoE 1 & PoE 2)
+    "Ranger": "Охотница",
+    "Warrior": "Воин",
+    "Monk": "Монах",
+    "Mercenary": "Наемник",
+    "Sorceress": "Заклинательница",
+    "Witch": "Ведьма",
+    "Duelist": "Дуэлянт",
+    "Shadow": "Бандит",
+    "Marauder": "Дикарь",
+    "Templar": "Жрец",
+    "Scion": "Дворянка",
+    "Druid": "Друид",
+    "Huntress": "Копейщица",
+
+    # Ascendancies (PoE 1)
+    "Juggernaut": "Покоритель",
+    "Berserker": "Берсерк",
+    "Chieftain": "Вождь",
+    "Raider": "Налетчица",
+    "Deadeye": "Снайпер",
+    "Pathfinder": "Следопыт",
+    "Occultist": "Оккультистка",
+    "Elementalist": "Элементалист",
+    "Necromancer": "Некромант",
+    "Slayer": "Рубака",
+    "Gladiator": "Гладиатор",
+    "Champion": "Чемпион",
+    "Assassin": "Убийца",
+    "Saboteur": "Диверсант",
+    "Trickster": "Плут",
+    "Inquisitor": "Инквизитор",
+    "Hierophant": "Иерофант",
+    "Guardian": "Защитник",
+    "Ascendant": "Вознесшаяся",
+
+    # Ascendancies (PoE 2)
+    "Titan": "Титан",
+    "Warbringer": "Вестник войны",
+    "Smith of Kitava": "Кузнец Китавы",
+    "Stormweaver": "Ткач бурь",
+    "Chronomancer": "Хрономант",
+    "Disciple of Varashta": "Ученица Варашты",
+    "Blood Mage": "Маг крови",
+    "Infernalist": "Инферналист",
+    "Lich": "Лич",
+    "Abyssal Lich": "Лич Бездны",
+    "Amazon": "Амазонка",
+    "Spirit Walker": "Ходящая среди духов",
+    "Ritualist": "Ритуалист",
+    "Tactician": "Тактик",
+    "Witchhunter": "Охотник на ведьм",
+    "Gemling Legionnaire": "Легионер каменитов",
+    "Martial Artist": "Мастер боевых искусств",
+    "Invoker": "Заклинатель стихий",
+    "Acolyte of Chayula": "Послушник Чаюлы",
+    "Oracle": "Оракул",
+    "Shaman": "Шаман",
+
+    # Common UI Actions
     "New": "Создать",
     "Import": "Импорт",
     "Export": "Экспорт",
@@ -94,87 +257,6 @@ UI_TRANSLATIONS = {
     "Create": "Создать",
     "Clear": "Очистить",
     "Update": "Обновить",
-    "Check for Update": "Проверить обновления",
-
-    # Character Attributes & Stats
-    "Level": "Уровень",
-    "Class": "Класс",
-    "Ascendancy": "Восхождение",
-    "Bandit": "Бандит",
-    "Pantheon": "Пантеон",
-    "Major God": "Старший бог",
-    "Minor God": "Младший бог",
-
-    # Left Sidebar Main Stats
-    "Life": "Здоровье",
-    "Mana": "Мана",
-    "Spirit": "Дух",
-    "Energy Shield": "Энергетический щит",
-    "Ward": "Оберег",
-    "Armour": "Броня",
-    "Evasion": "Уклонение",
-    "Evasion Rating": "Показатель уклонения",
-
-    # Resistances
-    "Fire Resistance": "Сопротивление огню",
-    "Cold Resistance": "Сопротивление холоду",
-    "Lightning Resistance": "Сопротивление молнии",
-    "Chaos Resistance": "Сопротивление хаосу",
-    "Fire": "Огонь",
-    "Cold": "Холод",
-    "Lightning": "Молния",
-    "Chaos": "Хаос",
-    "Physical": "Физический",
-
-    # Offence Stats
-    "Total DPS": "Общий ДПС",
-    "Effective DPS": "Эффективный ДПС",
-    "Hit DPS": "ДПС удара",
-    "Damage over Time": "Урон со временем",
-    "Dot DPS": "ДПС урона со временем",
-    "Bleed DPS": "ДПС кровотечения",
-    "Ignite DPS": "ДПС поджога",
-    "Poison DPS": "ДПС яда",
-    "Hit Chance": "Шанс попадания",
-    "Attack Rate": "Скорость атаки",
-    "Cast Rate": "Скорость сотворения",
-    "Crit Chance": "Шанс крит. удара",
-    "Crit Multiplier": "Множитель крит. удара",
-    "Attack Speed": "Скорость атаки",
-    "Cast Speed": "Скорость сотворения",
-
-    # Defence Stats
-    "Effective Hit Pool": "Эффективный запас здоровья (EHP)",
-    "Maximum Hit Taken": "Макс. выдерживаемый удар",
-    "Block Chance": "Шанс блока",
-    "Spell Block Chance": "Шанс блока чар",
-    "Spell Suppression Chance": "Шанс подавления чар",
-    "Physical Damage Reduction": "Снижение физ. урона",
-    "Movement Speed": "Скорость передвижения",
-
-    # Core Attributes
-    "Strength": "Сила",
-    "Dexterity": "Ловкость",
-    "Intelligence": "Интеллект",
-    "Req Str": "Треб. силы",
-    "Req Dex": "Треб. ловкости",
-    "Req Int": "Треб. инт.",
-
-    # Tree Tab
-    "Passive Skill Tree": "Дерево пассивных умений",
-    "Points Used": "Потрачено очков",
-    "Ascendancy Points Used": "Очков восхождения",
-    "Search Tree": "Поиск по дереву",
-    "Reset Tree": "Сбросить дерево",
-    "Show Node Power": "Сила нодов",
-
-    # Skills Tab
-    "Socket Groups": "Группы гнезд",
-    "Enabled": "Включено",
-    "Include in Full DPS": "Включить в полный ДПС",
-    "Gem Level": "Уровень камня",
-    "Gem Quality": "Качество камня",
-    "Skill Gems": "Камни умений",
 
     # Items Tab
     "Equipped Items": "Экипированные предметы",
@@ -193,7 +275,7 @@ UI_TRANSLATIONS = {
     "Ring 2": "Кольцо 2",
     "Belt": "Пояс",
 
-    # Branding & Custom UI
+    # Branding
     "Guides & Builds: arpg-life.ru": "Гайды и билды: arpg-life.ru",
     "ARPG-Life Edition": "ARPG-Life Edition (Русская версия)",
     "Language": "Язык",
@@ -206,7 +288,55 @@ def generate_ui_dictionary():
     write_lua_table(out_path, "ui_ru", UI_TRANSLATIONS)
 
 # ------------------------------------------------------------------------------
-# 2. PoE 1 Dictionary
+# 2. Affix Templates (Pattern-based numerical translations)
+# ------------------------------------------------------------------------------
+def generate_affix_templates():
+    templates = {}
+
+    def add_pair(en_tmpl, ru_tmpl):
+        if not en_tmpl or not ru_tmpl:
+            return
+        en_tmpl = en_tmpl.strip()
+        ru_tmpl = ru_tmpl.strip()
+
+        # Count {value} or numbers
+        c_en = en_tmpl.count("{value}")
+        c_ru = ru_tmpl.count("{value}")
+        if c_en > 0 and c_en == c_ru:
+            idx_en = 0
+            def repl_en(m):
+                nonlocal idx_en
+                res = f"{{{idx_en}}}"
+                idx_en += 1
+                return res
+
+            idx_ru = 0
+            def repl_ru(m):
+                nonlocal idx_ru
+                res = f"{{{idx_ru}}}"
+                idx_ru += 1
+                return res
+
+            pat_en = re.sub(r"\{value\}", repl_en, en_tmpl.lower())
+            pat_ru = re.sub(r"\{value\}", repl_ru, ru_tmpl)
+            templates[pat_en] = pat_ru
+
+    # 1. Load from poe1-affix-templates.json
+    t1 = load_json(os.path.join(AFFIX_DATA_DIR, "poe1-affix-templates.json")) or {}
+    for en, ru in t1.items():
+        add_pair(en, ru)
+
+    # 2. Load from poe1_scraped_affixes.json
+    t2 = load_json(os.path.join(POE_TOOLTIP_DIR, "poe1_scraped_affixes.json")) or []
+    for item in t2:
+        if isinstance(item, dict):
+            add_pair(item.get("templateEn"), item.get("template"))
+
+    out_path = os.path.join(DICT_DIR, "affix_templates.lua")
+    write_lua_table(out_path, "affix_templates", templates)
+
+# ------------------------------------------------------------------------------
+# 3. PoE 1 Dictionary
 # ------------------------------------------------------------------------------
 def generate_poe1_dictionary():
     dict1 = {}
@@ -223,12 +353,11 @@ def generate_poe1_dictionary():
     uniques = load_json(os.path.join(POE_TOOLTIP_DIR, "poe1_unique_items.json")) or []
     items_list = uniques.values() if isinstance(uniques, dict) else uniques
     for item in items_list:
-        if not isinstance(item, dict):
-            continue
-        en = item.get("englishName")
-        ru = item.get("nameRu")
-        if en and ru:
-            dict1[en.strip()] = ru.strip()
+        if isinstance(item, dict):
+            en = item.get("englishName")
+            ru = item.get("nameRu")
+            if en and ru:
+                dict1[en.strip()] = ru.strip()
 
     # 3. Bases
     bases = load_json(os.path.join(POE_DATA_DIR, "poe1_base_items.json")) or []
@@ -238,7 +367,7 @@ def generate_poe1_dictionary():
         if en and ru:
             dict1[en.strip()] = ru.strip()
 
-    # 4. Passive Tree Nodes
+    # 4. Passive Tree Nodes & Tree Stats
     tree_raw = load_json(os.path.join(POE_TREE_DIR, "Skill Trees", "3.29.0", "raw.json")) or {}
     tree_loc = load_json(os.path.join(POE_TREE_DIR, "Skill Trees", "3.29.0", "localization-ru.json")) or {}
     raw_nodes = tree_raw.get("nodes", {})
@@ -251,12 +380,26 @@ def generate_poe1_dictionary():
             if en_name and ru_name:
                 dict1[en_name.strip()] = ru_name.strip()
 
+            r_stats = r_node.get("stats", [])
+            l_stats = l_node.get("stats", [])
+            if len(r_stats) == len(l_stats):
+                for s_en, s_ru in zip(r_stats, l_stats):
+                    if s_en and s_ru:
+                        dict1[s_en.strip()] = s_ru.strip()
+
     out_path = os.path.join(DICT_DIR, "poe1_ru.lua")
     write_lua_table(out_path, "poe1_ru", dict1)
 
 # ------------------------------------------------------------------------------
-# 3. PoE 2 Dictionary
+# 4. PoE 2 Dictionary
 # ------------------------------------------------------------------------------
+def clean_tags(text):
+    if not isinstance(text, str):
+        return ""
+    text = re.sub(r"\[[^\]|]+\|([^\]]+)\]", r"\1", text)
+    text = re.sub(r"\[([^\]]+)\]", r"\1", text)
+    return text.strip()
+
 def generate_poe2_dictionary():
     dict2 = {}
 
@@ -272,12 +415,11 @@ def generate_poe2_dictionary():
     uniques2 = load_json(os.path.join(POE_DATA_DIR, "poe2_unique_items.json")) or []
     items_list2 = uniques2.values() if isinstance(uniques2, dict) else uniques2
     for item in items_list2:
-        if not isinstance(item, dict):
-            continue
-        en = item.get("englishName")
-        ru = item.get("nameRu")
-        if en and ru:
-            dict2[en.strip()] = ru.strip()
+        if isinstance(item, dict):
+            en = item.get("englishName")
+            ru = item.get("nameRu")
+            if en and ru:
+                dict2[en.strip()] = ru.strip()
 
     # 3. Bases
     bases2 = load_json(os.path.join(POE_DATA_DIR, "poe2_base_items.json")) or []
@@ -287,12 +429,15 @@ def generate_poe2_dictionary():
         if en and ru:
             dict2[en.strip()] = ru.strip()
 
-    # 4. Passive Tree Custom Translations
+    # 4. Passive Tree Custom Translations (Names and Stats)
     tree2 = load_json(os.path.join(POE2_TREE_DIR, "src", "tree", "custom_translations.json")) or {}
-    names2 = tree2.get("names", {})
-    for en, ru in names2.items():
+    for en, ru in tree2.get("names", {}).items():
         if en and ru:
-            dict2[en.strip()] = ru.strip()
+            dict2[clean_tags(en)] = clean_tags(ru)
+
+    for en, ru in tree2.get("stats", {}).items():
+        if en and ru:
+            dict2[clean_tags(en)] = clean_tags(ru)
 
     out_path = os.path.join(DICT_DIR, "poe2_ru.lua")
     write_lua_table(out_path, "poe2_ru", dict2)
@@ -300,6 +445,7 @@ def generate_poe2_dictionary():
 if __name__ == "__main__":
     print("=== Generating Translation Dictionaries for PoB ARPG-Life ===")
     generate_ui_dictionary()
+    generate_affix_templates()
     generate_poe1_dictionary()
     generate_poe2_dictionary()
     print("=== Dictionaries generated successfully ===")

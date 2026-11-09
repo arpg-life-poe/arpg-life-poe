@@ -11,6 +11,7 @@ local i18n = {}
 i18n.currentLanguage = "ru"
 i18n.uiDict = {}
 i18n.gameDict = {}
+i18n.templates = {}
 i18n.memo = {}
 
 -- Load dictionaries safely
@@ -18,6 +19,11 @@ function i18n.init(gameVersion)
     local uiOk, uiTable = pcall(require, "i18n.dictionaries.ui_ru")
     if uiOk and type(uiTable) == "table" then
         i18n.uiDict = uiTable
+    end
+
+    local tmplOk, tmplTable = pcall(require, "i18n.dictionaries.affix_templates")
+    if tmplOk and type(tmplTable) == "table" then
+        i18n.templates = tmplTable
     end
 
     local gameDictName = (gameVersion == "poe2" or gameVersion == 2) and "i18n.dictionaries.poe2_ru" or "i18n.dictionaries.poe1_ru"
@@ -53,7 +59,45 @@ local function lookupToken(token)
     return nil
 end
 
--- Translate single line handling color escapes and colon suffix
+-- Pattern-based numerical affix and stat matching
+local function tryMatchTemplate(text)
+    if not text:find("%d") then
+        return nil
+    end
+
+    local nums = {}
+    local idx = 0
+
+    -- Extract numbers and replace with {0}, {1}, etc.
+    -- Keeps sign (+/-) outside placeholder if present
+    local pattern = text:lower()
+    pattern = pattern:gsub("([%+%-]?)(%d+%.?%d*)", function(sign, num)
+        local ph = (sign or "") .. "{" .. idx .. "}"
+        nums[idx] = num
+        idx = idx + 1
+        return ph
+    end)
+
+    local trans = i18n.templates[pattern]
+    if not trans then
+        local trimmed = pattern:match("^%s*(.-)%s*$")
+        if trimmed and trimmed ~= pattern then
+            trans = i18n.templates[trimmed]
+        end
+    end
+
+    if trans then
+        local result = trans:gsub("{(%d+)}", function(n)
+            local numIdx = tonumber(n)
+            return nums[numIdx] or ("{" .. n .. "}")
+        end)
+        return result
+    end
+
+    return nil
+end
+
+-- Translate single line handling color escapes, prefixes, and suffixes
 local function translateLine(line)
     if not line or #line == 0 then
         return line
@@ -74,6 +118,19 @@ local function translateLine(line)
         end
     end
 
+    -- Check for specific known prefixes (e.g., "Current build: ")
+    local customPrefix = ""
+    if rest:sub(1, 15) == "Current build: " then
+        customPrefix = "Текущий билд: "
+        rest = rest:sub(16)
+    elseif rest:sub(1, 9) == "Version: " then
+        customPrefix = "Версия: "
+        rest = rest:sub(10)
+    elseif rest:sub(1, 14) == "Game Version: " then
+        customPrefix = "Версия игры: "
+        rest = rest:sub(15)
+    end
+
     -- Check for trailing colon (common in UI labels like "Life:" or "Total DPS:")
     local suffix = ""
     if rest:sub(-1) == ":" then
@@ -81,13 +138,23 @@ local function translateLine(line)
         rest = rest:sub(1, -2)
     end
 
-    -- Direct dictionary match
+    -- 1. Direct dictionary match
     local translated = lookupToken(rest)
     if translated then
-        return prefix .. translated .. suffix
+        return prefix .. customPrefix .. translated .. suffix
     end
 
-    -- If no exact match, return original line
+    -- 2. Try numerical template matching
+    local templated = tryMatchTemplate(rest)
+    if templated then
+        return prefix .. customPrefix .. templated .. suffix
+    end
+
+    -- If no match, return original line with custom prefix if matched
+    if #customPrefix > 0 then
+        return prefix .. customPrefix .. rest .. suffix
+    end
+
     return line
 end
 
