@@ -984,6 +984,138 @@ class DictionaryBuilder:
         print(f"  PoE 2 Node Stats direct match: {matched_pob2_stats}/{total_pob2_stats} ({matched_pob2_stats/total_pob2_stats*100:.1f}%)")
 
     # --------------------------------------------------------------------------
+    # Collect Reminder Texts for Tooltips
+    # --------------------------------------------------------------------------
+    def collect_reminder_texts(self):
+        print("\n=== Collecting Reminder Texts from Passive Trees ===")
+        rem_path = os.path.join(POE1_TREE_DIR, "Skill Trees", "3.29.0", "reminder-text-ru.json")
+        raw_path = os.path.join(POE1_TREE_DIR, "Skill Trees", "3.29.0", "raw.json")
+
+        rem_ru = load_json(rem_path) or {}
+        raw_nodes = (load_json(raw_path) or {}).get("nodes", {})
+
+        count = 0
+        for nid, ru_lines in rem_ru.items():
+            if nid in raw_nodes:
+                en_lines = raw_nodes[nid].get("reminderText", [])
+                if len(en_lines) == len(ru_lines):
+                    for s_en, s_ru in zip(en_lines, ru_lines):
+                        s_en_clean = clean_tags(s_en).strip()
+                        s_ru_clean = clean_tags(s_ru).strip()
+                        if s_en_clean and s_ru_clean:
+                            self.poe1_dict[s_en_clean] = s_ru_clean
+                            if s_en_clean.startswith("(") and s_en_clean.endswith(")"):
+                                self.poe1_dict[s_en_clean[1:-1].strip()] = s_ru_clean.strip("()")
+                            count += 1
+                    if nid in self.poe1_nodes_by_id:
+                        self.poe1_nodes_by_id[nid]["reminder_text_en"] = en_lines
+                        self.poe1_nodes_by_id[nid]["reminder_text_ru"] = ru_lines
+        print(f"  Loaded {count} reminderText pairs for PoE 1")
+
+    # --------------------------------------------------------------------------
+    # Collect Gem Descriptions for Tooltips
+    # --------------------------------------------------------------------------
+    def collect_gem_descriptions(self):
+        print("\n=== Collecting Gem Descriptions for Tooltips ===")
+        # PoE 1
+        g1 = load_json(os.path.join(POE_PARSER_DATA, "poe1_gems_enriched.json")) or []
+        g1_map = {x.get("englishName", "").strip(): x.get("description", "").strip() for x in g1 if x.get("description")}
+
+        count1 = 0
+        pob1_skills_path = os.path.join(POB1_SRC, "Data", "Skills", "*.lua")
+        for p in glob.glob(pob1_skills_path):
+            with open(p, "r", encoding="utf-8") as f:
+                content = f.read()
+            for name, desc in re.findall(r'name\s*=\s*\"([^\"]+)\".*?description\s*=\s*\"([^\"]+)\"', content, re.DOTALL):
+                ru_desc = g1_map.get(name) or g1_map.get(name.replace(" Support", ""))
+                if ru_desc:
+                    desc_clean = clean_tags(desc).strip()
+                    ru_desc_clean = clean_tags(ru_desc).strip()
+                    self.poe1_dict[desc_clean] = ru_desc_clean
+                    count1 += 1
+        print(f"  Loaded {count1} gem descriptions for PoE 1")
+
+        # PoE 2
+        g2 = load_json(os.path.join(POE_PARSER_DATA, "poe2_gems_enriched.json")) or []
+        g2_map = {x.get("englishName", "").strip(): x.get("description", "").strip() for x in g2 if x.get("description")}
+
+        count2 = 0
+        pob2_skills_path = os.path.join(POB2_SRC, "Data", "Skills", "*.lua")
+        for p in glob.glob(pob2_skills_path):
+            with open(p, "r", encoding="utf-8") as f:
+                content = f.read()
+            for name, desc in re.findall(r'name\s*=\s*\"([^\"]+)\".*?description\s*=\s*\"([^\"]+)\"', content, re.DOTALL):
+                ru_desc = g2_map.get(name) or g2_map.get(name.replace(" Support", ""))
+                if ru_desc:
+                    desc_clean = clean_tags(desc).strip()
+                    ru_desc_clean = clean_tags(ru_desc).strip()
+                    self.poe2_dict[desc_clean] = ru_desc_clean
+                    count2 += 1
+        print(f"  Loaded {count2} gem descriptions for PoE 2")
+
+    # --------------------------------------------------------------------------
+    # Collect Unique Item Mod Pairs for Tooltips
+    # --------------------------------------------------------------------------
+    def collect_unique_mod_pairs(self):
+        print("\n=== Collecting Unique Item Mod Pairs for Tooltips ===")
+
+        def process_uniques(uniques_json_path, pob_uniques_glob, target_dict, game):
+            u_list = load_json(uniques_json_path) or []
+            u_by_name = {x.get("englishName", "").strip(): x for x in u_list if x.get("englishName")}
+            u_norm = {norm_key(k): v for k, v in u_by_name.items()}
+
+            pair_count = 0
+            for file_path in glob.glob(pob_uniques_glob):
+                with open(file_path, "r", encoding="utf-8") as f:
+                    content = f.read()
+                blocks = re.findall(r'\[\[\s*\n(.*?)\n\]\]', content, re.DOTALL)
+                for b in blocks:
+                    lines = [line.strip() for line in b.split('\n') if line.strip()]
+                    if not lines:
+                        continue
+                    item_name = lines[0]
+                    u_json = u_by_name.get(item_name) or u_norm.get(norm_key(item_name))
+                    if not u_json:
+                        continue
+
+                    # Filter English mod lines
+                    en_mods = []
+                    for line in lines[2:]:
+                        if line.startswith("Variant:") or line.startswith("Requires ") or line.startswith("Implicits:"):
+                            continue
+                        clean_line = re.sub(r'\{variant:[^}]+\}', '', line)
+                        clean_line = re.sub(r'\{tags:[^}]+\}', '', clean_line).strip()
+                        if clean_line:
+                            en_mods.append(clean_line)
+
+                    ru_mods = (u_json.get("implicitMods") or []) + (u_json.get("explicitMods") or [])
+                    if len(en_mods) == len(ru_mods):
+                        for s_en, s_ru in zip(en_mods, ru_mods):
+                            s_en_clean = clean_tags(s_en).strip()
+                            s_ru_clean = clean_tags(s_ru).strip()
+                            if s_en_clean and s_ru_clean:
+                                target_dict[s_en_clean] = s_ru_clean
+                                self.add_affix_template(s_en_clean, s_ru_clean, game=game)
+                                pair_count += 1
+            return pair_count
+
+        p1_pairs = process_uniques(
+            os.path.join(POE_TOOLTIP_DIR, "poe1_unique_items.json"),
+            os.path.join(POB1_SRC, "Data", "Uniques", "*.lua"),
+            self.poe1_dict,
+            "poe1"
+        )
+        print(f"  Extracted {p1_pairs} unique item mod pairs for PoE 1")
+
+        p2_pairs = process_uniques(
+            os.path.join(POE_PARSER_DATA, "poe2_unique_items.json"),
+            os.path.join(POB2_SRC, "Data", "Uniques", "*.lua"),
+            self.poe2_dict,
+            "poe2"
+        )
+        print(f"  Extracted {p2_pairs} unique item mod pairs for PoE 2")
+
+    # --------------------------------------------------------------------------
     # Save Everything
     # --------------------------------------------------------------------------
     def save_all(self):
@@ -1143,6 +1275,9 @@ def main():
     builder.collect_affix_templates()
     builder.build_poe1()
     builder.build_poe2()
+    builder.collect_reminder_texts()
+    builder.collect_gem_descriptions()
+    builder.collect_unique_mod_pairs()
     builder.save_all()
     builder.verify_coverage()
 
