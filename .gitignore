@@ -1,0 +1,29 @@
+# Dependencies and upstream sources
+upstream/
+build/
+dist/
+bin/
+
+# Temporary and build artifacts
+*.o
+*.obj
+*.a
+*.dylib
+*.so
+*.dll
+*.exe
+*.app
+*.dmg
+*.zip
+*.tar.gz
+
+# IDE and OS
+.DS_Store
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs and cache
+*.log
+.cache/
