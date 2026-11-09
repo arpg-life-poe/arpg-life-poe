@@ -5144,6 +5144,12 @@
   "Enfeeble self-only": [
     "PoE1:Modules/ConfigOptions.lua:label"
   ],
+  "English": [
+    "PoE1:Modules/Main.lua:dropdown_label",
+    "PoE1:Modules/Main.lua:label",
+    "PoE2:Modules/Main.lua:dropdown_label",
+    "PoE2:Modules/Main.lua:label"
+  ],
   "Enter a valid trade URL": [
     "PoE1:Classes/TradeQuery.lua:tooltip_line",
     "PoE2:Classes/TradeQuery.lua:tooltip_line"
@@ -13785,5 +13791,11 @@
   "will give you": [
     "PoE1:Classes/ItemsTab.lua:ui_keyword",
     "PoE2:Classes/ItemsTab.lua:ui_keyword"
+  ],
+  "Русский (ARPG-Life.ru)": [
+    "PoE1:Modules/Main.lua:dropdown_label",
+    "PoE1:Modules/Main.lua:label",
+    "PoE2:Modules/Main.lua:dropdown_label",
+    "PoE2:Modules/Main.lua:label"
   ]
 }

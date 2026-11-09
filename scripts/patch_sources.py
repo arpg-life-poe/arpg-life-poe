@@ -73,16 +73,25 @@ def patch_main_lua(src_path, game):
     with open(main_path, "r", encoding="utf-8") as f:
         content = f.read()
 
-    # 1. Add arpg-life.ru button in bottom bar
+    # 1. Add arpg-life.ru button in bottom bar:
+    # Placed at {0, -24, 140, 20} occupying the slot of the hidden checkUpdate button
+    # directly above Options and About, without overlapping the version label at {148, -2}.
     btn_target = r'(self\.controls\.about\s*=\s*new\("ButtonControl"\)[^\n]+\n[^\n]+\n\s*end\))'
     btn_replacement = r'''\1
 	-- [ARPG-Life.ru] Branding Button
-	self.controls.arpgLife = new("ButtonControl"):ButtonControl({"BOTTOMLEFT",self.anchorMain,"BOTTOMLEFT"}, {144, 0, 160, 20}, "^xA0C0FFarpg-life.ru", function()
+	self.controls.arpgLife = new("ButtonControl"):ButtonControl({"BOTTOMLEFT",self.anchorMain,"BOTTOMLEFT"}, {0, -24, 140, 20}, "^xA0C0FFarpg-life.ru", function()
 		OpenURL("https://arpg-life.ru")
 	end)'''
 
     if "self.controls.arpgLife" not in content:
         content = re.sub(btn_target, btn_replacement, content, count=1)
+    else:
+        # Update coordinates if already present
+        content = re.sub(
+            r'self\.controls\.arpgLife\s*=\s*new\("ButtonControl"\):ButtonControl\(\{"BOTTOMLEFT",self\.anchorMain,"BOTTOMLEFT"\},\s*\{[^\}]+\}',
+            'self.controls.arpgLife = new("ButtonControl"):ButtonControl({"BOTTOMLEFT",self.anchorMain,"BOTTOMLEFT"}, {0, -24, 140, 20}',
+            content
+        )
 
     # 2. Hide checkUpdate button
     content = re.sub(
@@ -138,6 +147,37 @@ def patch_main_lua(src_path, game):
     print(f"Successfully patched {main_path}")
     return True
 
+def patch_tooltip_lua(src_path, game):
+    tooltip_path = os.path.join(src_path, "Classes", "Tooltip.lua")
+    if not os.path.exists(tooltip_path):
+        print(f"Error: {tooltip_path} not found")
+        return False
+
+    with open(tooltip_path, "r", encoding="utf-8") as f:
+        content = f.read()
+
+    # Intercept TooltipClass:AddLine BEFORE main:WrapString cuts lines into untranslatable fragments
+    addline_inject = '''
+		-- [ARPG-Life.ru] Translate whole unbroken tooltip line before word-wrapping
+		local i18nOk, i18n = pcall(require, "i18n.modules.i18n")
+		if i18nOk and i18n and i18n.translate then
+			text = i18n.translate(text)
+		end'''
+
+    if "-- [ARPG-Life.ru] Translate whole unbroken tooltip line" not in content:
+        content = re.sub(
+            r'(function TooltipClass:AddLine\([^)]*\)\s*\n\s*if text then)',
+            r'\1' + addline_inject,
+            content,
+            count=1
+        )
+
+    with open(tooltip_path, "w", encoding="utf-8") as f:
+        f.write(content)
+
+    print(f"Successfully patched {tooltip_path}")
+    return True
+
 if __name__ == "__main__":
     if len(sys.argv) < 3:
         print("Usage: patch_sources.py <src_directory> <poe1|poe2>")
@@ -148,4 +188,5 @@ if __name__ == "__main__":
     print(f"=== Patching sources in {src_dir} for {game_mode} ===")
     patch_launch_lua(src_dir, game_mode)
     patch_main_lua(src_dir, game_mode)
+    patch_tooltip_lua(src_dir, game_mode)
     print("=== Patching complete ===")
