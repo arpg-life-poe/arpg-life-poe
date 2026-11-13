@@ -197,10 +197,11 @@ jobs:
       - name: Publish Release to GitHub
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: latest
+          tag_name: v2026.11.13
           name: "Path of Building — ARPG-Life Edition"
           body_path: release_notes.md
           prerelease: false
+          make_latest: "true"
           files: |
             release_files/*.zip
             release_files/*.sha256
