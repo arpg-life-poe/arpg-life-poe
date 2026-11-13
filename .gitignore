@@ -3,8 +3,10 @@ upstream/
 build/
 dist/
 bin/
+assets/fonts/
 
 # Temporary and build artifacts
+scripts/fontgen/fontgen
 *.o
 *.obj
 *.a

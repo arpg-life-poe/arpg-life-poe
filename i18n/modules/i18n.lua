@@ -438,4 +438,15 @@ function i18n.hookEngine()
 	end
 end
 
+-- Submodule: updater
+i18n.updater = setmetatable({}, {
+	__index = function(_, key)
+		local ok, mod = pcall(require, "i18n.modules.updater")
+		if ok and mod then
+			return mod[key]
+		end
+		return nil
+	end
+})
+
 return i18n

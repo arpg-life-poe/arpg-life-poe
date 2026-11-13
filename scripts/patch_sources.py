@@ -73,25 +73,47 @@ def patch_main_lua(src_path, game):
     with open(main_path, "r", encoding="utf-8") as f:
         content = f.read()
 
-    # 1. Add arpg-life.ru button in bottom bar:
-    # Placed at {0, -24, 140, 20} occupying the slot of the hidden checkUpdate button
-    # directly above Options and About, without overlapping the version label at {148, -2}.
+    # 1. Add arpg-life.ru / Updater Button in bottom bar:
+    # Placed at {0, -24, 140, 20} occupying the slot above Options/About.
+    # When an update is detected, lights up green: "^x50E050Доступно обновление!"
     btn_target = r'(self\.controls\.about\s*=\s*new\("ButtonControl"\)[^\n]+\n[^\n]+\n\s*end\))'
     btn_replacement = r'''\1
-	-- [ARPG-Life.ru] Branding Button
-	self.controls.arpgLife = new("ButtonControl"):ButtonControl({"BOTTOMLEFT",self.anchorMain,"BOTTOMLEFT"}, {0, -24, 140, 20}, "^xA0C0FFarpg-life.ru", function()
-		OpenURL("https://arpg-life.ru")
+	-- [ARPG-Life.ru] Branding & Auto-Updater Button
+	self.controls.arpgLife = new("ButtonControl"):ButtonControl({"BOTTOMLEFT",self.anchorMain,"BOTTOMLEFT"}, {0, -24, 140, 20}, "", function()
+		local uOk, updater = pcall(require, "i18n.modules.updater")
+		if uOk and updater then
+			if launch.arpgUpdateAvailable then
+				updater.showPopup(self, launch)
+			else
+				updater.checkForUpdates(self, launch, true)
+			end
+		else
+			OpenURL("https://arpg-life.ru")
+		end
+	end)
+	self.controls.arpgLife.label = function()
+		if launch.arpgCheckingUpdate then
+			return "^8Проверка..."
+		elseif launch.arpgUpdateAvailable then
+			return "^x50E050Обновление!"
+		else
+			return "^xA0C0FFarpg-life.ru"
+		end
+	end
+	-- Initialize ARPG-Life Auto-Updater
+	pcall(function()
+		local uOk, updater = pcall(require, "i18n.modules.updater")
+		if uOk and updater then
+			updater.init(self, launch)
+		end
 	end)'''
 
     if "self.controls.arpgLife" not in content:
         content = re.sub(btn_target, btn_replacement, content, count=1)
     else:
-        # Update coordinates if already present
-        content = re.sub(
-            r'self\.controls\.arpgLife\s*=\s*new\("ButtonControl"\):ButtonControl\(\{"BOTTOMLEFT",self\.anchorMain,"BOTTOMLEFT"\},\s*\{[^\}]+\}',
-            'self.controls.arpgLife = new("ButtonControl"):ButtonControl({"BOTTOMLEFT",self.anchorMain,"BOTTOMLEFT"}, {0, -24, 140, 20}',
-            content
-        )
+        # Replace existing arpgLife block with the enhanced updater button
+        pattern = r'-- \[ARPG-Life\.ru\] Branding Button[\s\S]*?OpenURL\("https://arpg-life\.ru"\)\s*end\)'
+        content = re.sub(pattern, btn_replacement.replace(r'\1\n', ''), content)
 
     # 2. Hide checkUpdate button
     content = re.sub(

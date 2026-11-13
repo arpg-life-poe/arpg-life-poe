@@ -186,11 +186,23 @@ PY
   codesign --force --deep -s - "${FINAL_APP}"
   codesign --verify --deep --strict "${FINAL_APP}"
 
+  # Copy macOS First-Launch Helper scripts into package directory
+  echo "==> Adding first-launch helper and instruction..."
+  cp "${ROOT_DIR}/scripts/macos-helper/Запустить первый раз (снять блокировку macOS).command" "${DIST_DIR}/"
+  cp "${ROOT_DIR}/scripts/macos-helper/ИНСТРУКЦИЯ.txt" "${DIST_DIR}/"
+  chmod +x "${DIST_DIR}/Запустить первый раз (снять блокировку macOS).command"
+
   # Package into ZIP and create SHA-256
-  local ZIP_NAME="${GAME}-macos-arm64.zip"
-  echo "==> Creating distribution archive: ${ZIP_NAME}..."
-  ditto -c -k --keepParent "${FINAL_APP}" "${DIST_DIR}/${ZIP_NAME}"
-  (cd "${DIST_DIR}" && shasum -a 256 "${ZIP_NAME}" > "${ZIP_NAME}.sha256")
+  local GAME_NAME="PoE1"
+  if [ "${GAME}" = "poe2" ]; then
+    GAME_NAME="PoE2"
+  fi
+  local ZIP_NAME="PathOfBuilding-${GAME_NAME}-macOS-arm64.zip"
+  echo "==> Creating clean distribution archive: ${ZIP_NAME}..."
+  rm -f "${DIST_DIR}"/*.zip*
+  rm -f "${DIST_ROOT}/${ZIP_NAME}" "${DIST_ROOT}/${ZIP_NAME}.sha256"
+  (cd "${DIST_DIR}" && COPYFILE_DISABLE=1 ditto --noextattr --norsrc -c -k . "${DIST_ROOT}/${ZIP_NAME}")
+  (cd "${DIST_ROOT}" && shasum -a 256 "${ZIP_NAME}" > "${ZIP_NAME}.sha256")
 
   echo "==> Successfully built and packaged ${APP_NAME}!"
   echo "    Path: ${FINAL_APP}"

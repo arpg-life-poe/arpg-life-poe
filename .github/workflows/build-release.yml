@@ -1,0 +1,211 @@
+name: Build & Release (macOS & Windows)
+
+on:
+  schedule:
+    - cron: '0 */6 * * *'
+  workflow_dispatch:
+    inputs:
+      force_build:
+        description: 'Force build even if upstream unchanged'
+        type: boolean
+        default: true
+      publish_release:
+        description: 'Publish or update GitHub Release'
+        type: boolean
+        default: true
+  push:
+    branches:
+      - main
+    paths:
+      - 'upstream-versions.json'
+      - 'i18n/**'
+      - 'patches/**'
+      - 'scripts/**'
+      - 'macos-host/**'
+      - 'assets/**'
+      - '.github/workflows/build-release.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  check-upstream:
+    name: Check Upstream Updates
+    runs-on: ubuntu-latest
+    outputs:
+      updated: ${{ steps.check.outputs.updated }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Check Upstream Repositories
+        id: check
+        run: |
+          python3 scripts/check_upstream.py
+
+      - name: Commit & Push if Upstream Changed
+        if: steps.check.outputs.updated == 'true'
+        run: |
+          git config user.name "vlad1116"
+          git config user.email "75042578+vlad1116@users.noreply.github.com"
+          git add upstream-versions.json
+          git commit -m "Auto-update upstream versions [skip ci]"
+          git push origin main
+
+  build-macos:
+    name: Build macOS (PoE 1 & PoE 2)
+    runs-on: macos-14
+    needs: check-upstream
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      github.event_name == 'push' ||
+      needs.check-upstream.outputs.updated == 'true' ||
+      inputs.force_build == true
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install dependencies via Homebrew
+        run: |
+          brew install cmake ninja pkg-config sdl3 luajit libzstd
+
+      - name: Sync upstream repositories
+        run: |
+          ./scripts/sync_upstream.sh
+
+      - name: Build macOS Applications
+        run: |
+          ./scripts/build_macos.sh all
+
+      - name: Upload macOS Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: pob-macos-arm64
+          path: |
+            dist/PathOfBuilding-PoE1-macOS-arm64.zip
+            dist/PathOfBuilding-PoE1-macOS-arm64.zip.sha256
+            dist/PathOfBuilding-PoE2-macOS-arm64.zip
+            dist/PathOfBuilding-PoE2-macOS-arm64.zip.sha256
+
+  build-windows:
+    name: Build Windows (PoE 1 & PoE 2)
+    runs-on: windows-latest
+    needs: check-upstream
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      github.event_name == 'push' ||
+      needs.check-upstream.outputs.updated == 'true' ||
+      inputs.force_build == true
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Pillow for font generation
+        run: |
+          pip install Pillow
+
+      - name: Sync upstream repositories
+        shell: bash
+        run: |
+          ./scripts/sync_upstream.sh
+
+      - name: Build Windows Distributions
+        shell: bash
+        run: |
+          python scripts/build_windows.py all
+
+      - name: Upload Windows Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: pob-windows-x64
+          path: |
+            dist/PathOfBuilding-PoE1-Windows-x64.zip
+            dist/PathOfBuilding-PoE1-Windows-x64.zip.sha256
+            dist/PathOfBuilding-PoE2-Windows-x64.zip
+            dist/PathOfBuilding-PoE2-Windows-x64.zip.sha256
+
+  release:
+    name: Publish GitHub Release
+    runs-on: ubuntu-latest
+    needs: [check-upstream, build-macos, build-windows]
+    if: |
+      always() &&
+      (needs.build-macos.result == 'success' || needs.build-windows.result == 'success') &&
+      (github.event_name == 'workflow_dispatch' || github.event_name == 'push' || needs.check-upstream.outputs.updated == 'true')
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release_files
+          merge-multiple: true
+
+      - name: Generate Release Body
+        id: release_body
+        run: |
+          DATE=$(date -u +"%Y-%m-%d %H:%M UTC")
+          cat << 'EOF' > release_notes.md
+          ## Path of Building — ARPG-Life Edition (PoE 1 & PoE 2)
+          **Официальный сайт проекта:** [arpg-life.ru](https://arpg-life.ru)  
+          **Автор сборки:** `vlad1116`  
+
+          Автоматическая сборка Path of Building для Path of Exile 1 и Path of Exile 2 с полной поддержкой русского языка, кириллицы и встроенным авто-апдейтером.
+
+          ---
+
+          ### 📦 Ссылки на загрузку
+
+          #### Path of Exile 1:
+          - 🍎 **macOS (Apple Silicon arm64):** `PathOfBuilding-PoE1-macOS-arm64.zip`
+          - 🪟 **Windows (x64):** `PathOfBuilding-PoE1-Windows-x64.zip`
+
+          #### Path of Exile 2:
+          - 🍎 **macOS (Apple Silicon arm64):** `PathOfBuilding-PoE2-macOS-arm64.zip`
+          - 🪟 **Windows (x64):** `PathOfBuilding-PoE2-Windows-x64.zip`
+
+          ---
+
+          ### 🚀 Инструкция по первому запуску на macOS
+          Поскольку приложение собрано без платного сертификата Apple Developer ID, при первом запуске macOS может показать стандартное предупреждение защиты:
+          1. Распакуйте скачанный `.zip` архив.
+          2. Дважды нажмите на файл **`Запустить первый раз (снять блокировку macOS).command`**.
+          3. Скрипт снимет карантин Gatekeeper (`xattr -cr`) и автоматически запустит Path of Building.
+          4. В дальнейшем открывайте приложение обычным кликом по `Path of Building.app`.
+
+          ---
+
+          ### ✨ Особенности ARPG-Life Edition:
+          - **Кириллица и русский язык из коробки:** интерфейс, ноды дерева, моды и предметы переведены на русский язык.
+          - **Переключатель языка:** кнопка в правом верхнем углу (RU / EN) для мгновенного переключения.
+          - **Встроенный авто-апдейтер:** при выходе обновлений кнопка в левом нижнем углу подсвечивается зеленым и позволяет в 1 клик обновить словари перевода без перезапуска.
+          - **Высокая производительность:** нативный хост SDL3 под Apple Silicon на macOS и оптимизированный движок шрифтов на Windows.
+
+          ---
+          *Сборка обновлена: TIMESTAMP*
+          EOF
+          sed -i "s/TIMESTAMP/$DATE/g" release_notes.md
+
+      - name: Publish Release to GitHub
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: "Path of Building — ARPG-Life Edition"
+          body_path: release_notes.md
+          prerelease: false
+          files: |
+            release_files/*.zip
+            release_files/*.sha256
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
