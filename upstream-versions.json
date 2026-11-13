@@ -1,0 +1,32 @@
+{
+  "updated_at": "2026-11-13T07:34:00+03:00",
+  "poe1": {
+    "repository": "https://github.com/PathOfBuildingCommunity/PathOfBuilding.git",
+    "branch": "dev",
+    "commit": "a69391d6daaaea1aaf8054668a094aad88dd7eaa",
+    "commit_short": "a69391d",
+    "commit_date": "2026-11-10T14:27:16+13:00",
+    "commit_subject": "Update DLLs to SimpleGraphic-v2.5.6 (#10425)",
+    "latest_release_tag": "v2.67.2",
+    "simple_graphic_version": "v2.5.6"
+  },
+  "poe2": {
+    "repository": "https://github.com/PathOfBuildingCommunity/PathOfBuilding-PoE2.git",
+    "branch": "dev",
+    "commit": "601768bd105869618c3d6581b883e5d7aeec91b2",
+    "commit_short": "601768b",
+    "commit_date": "2026-11-10T14:31:39+13:00",
+    "commit_subject": "Update DLLs to SimpleGraphic-v2.5.6 (#2586)",
+    "latest_release_tag": "v2.49.3",
+    "simple_graphic_version": "v2.5.6"
+  },
+  "simple_graphic": {
+    "repository": "https://github.com/PathOfBuildingCommunity/PathOfBuilding-SimpleGraphic.git",
+    "branch": "master",
+    "commit": "421d1880499be82fe7db931885bdf0bc2cce531e",
+    "commit_short": "421d188",
+    "commit_date": "2026-11-10T02:22:15+01:00",
+    "commit_subject": "Merge pull request #121 from zao/feat/bump-deps-nov",
+    "latest_release_tag": "v2.5.6"
+  }
+}
