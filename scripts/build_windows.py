@@ -33,6 +33,15 @@ def calculate_sha256(filepath):
 def ensure_cyrillic_fonts():
     """Ensure assets/fonts contains generated Cyrillic fonts"""
     if not ASSETS_FONTS_DIR.exists() or not any(ASSETS_FONTS_DIR.glob("*.tgf")):
+        fonts_zip = ROOT_DIR / "assets" / "fonts.zip"
+        if fonts_zip.exists():
+            print(f"Extracting bundled Cyrillic fonts from {fonts_zip}...")
+            ASSETS_FONTS_DIR.mkdir(parents=True, exist_ok=True)
+            with zipfile.ZipFile(fonts_zip, "r") as zf:
+                zf.extractall(ASSETS_FONTS_DIR)
+            print("Cyrillic fonts extracted successfully!")
+            return
+
         print("Cyrillic fonts not found in assets/fonts. Generating now...")
         cmd = [sys.executable, str(SCRIPTS_DIR / "generate_cyrillic_fonts.py"), str(ASSETS_FONTS_DIR)]
         subprocess.check_call(cmd)

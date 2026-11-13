@@ -59,7 +59,8 @@ jobs:
 
   build-macos:
     name: Build macOS (PoE 1 & PoE 2)
-    runs-on: macos-14
+    runs-on: macos-latest
+    continue-on-error: true
     needs: check-upstream
     if: |
       github.event_name == 'workflow_dispatch' ||
@@ -109,10 +110,6 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-
-      - name: Install Pillow for font generation
-        run: |
-          pip install Pillow
 
       - name: Sync upstream repositories
         shell: bash

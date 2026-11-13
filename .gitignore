@@ -17,6 +17,7 @@ scripts/fontgen/fontgen
 *.app
 *.dmg
 *.zip
+!assets/fonts.zip
 *.tar.gz
 
 # IDE and OS
