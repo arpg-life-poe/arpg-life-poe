@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-11-13T07:34:00+03:00",
+  "updated_at": "2026-11-13T05:30:48.378659+00:00",
   "poe1": {
     "repository": "https://github.com/PathOfBuildingCommunity/PathOfBuilding.git",
     "branch": "dev",
@@ -23,7 +23,7 @@
   "simple_graphic": {
     "repository": "https://github.com/PathOfBuildingCommunity/PathOfBuilding-SimpleGraphic.git",
     "branch": "master",
-    "commit": "421d1880499be82fe7db931885bdf0bc2cce531e",
+    "commit": "421d18871cccb2696b5a57e6d72a9fc22fa641ae",
     "commit_short": "421d188",
     "commit_date": "2026-11-10T02:22:15+01:00",
     "commit_subject": "Merge pull request #121 from zao/feat/bump-deps-nov",
