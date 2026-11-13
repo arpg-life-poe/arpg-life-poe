@@ -73,7 +73,7 @@ jobs:
 
       - name: Install dependencies via Homebrew
         run: |
-          brew install cmake ninja pkg-config sdl3 luajit libzstd
+          brew install cmake ninja pkg-config sdl3 luajit zstd
 
       - name: Sync upstream repositories
         run: |
