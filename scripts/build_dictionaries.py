@@ -612,15 +612,25 @@ class DictionaryBuilder:
                 if norm_key(en) != en:
                     self.poe1_dict[norm_key(en)] = ru
 
-        # 5. Passive Tree (Skill Trees/3.29.0)
-        tree_raw = load_json(os.path.join(POE1_TREE_DIR, "Skill Trees", "3.29.0", "raw.json")) or {}
-        tree_loc = load_json(os.path.join(POE1_TREE_DIR, "Skill Trees", "3.29.0", "localization-ru.json")) or {}
-        raw_nodes = tree_raw.get("nodes", {})
-        loc_nodes = tree_loc.get("nodes", {})
+        # 5. Passive Tree (Skill Trees/3.29.0 and 3.30.0)
+        raw_nodes = {}
+        loc_nodes = {}
+        for tree_ver in ["3.29.0", "3.30.0"]:
+            tree_raw_path = os.path.join(POE1_TREE_DIR, "Skill Trees", tree_ver, "raw.json")
+            tree_loc_path = os.path.join(POE1_TREE_DIR, "Skill Trees", tree_ver, "localization-ru.json")
+            if os.path.exists(tree_raw_path) and os.path.exists(tree_loc_path):
+                t_raw = load_json(tree_raw_path) or {}
+                t_loc = load_json(tree_loc_path) or {}
+                raw_nodes.update(t_raw.get("nodes", {}))
+                loc_nodes.update(t_loc.get("nodes", {}))
+                print(f"  Loaded PoE1 Tree {tree_ver}: {len(raw_nodes)} raw nodes, {len(loc_nodes)} localized nodes")
 
-        # Also load PoB tree.lua directly to ensure exact string matching
-        pob1_nodes = parse_pob_tree_nodes(os.path.join(POB1_SRC, "TreeData", "3_29", "tree.lua"))
-        print(f"  PoB1 3_29 tree.lua parsed: {len(pob1_nodes)} nodes")
+        # Also load PoB tree.lua directly to ensure exact string matching (prefer 3_30 if present, else 3_29)
+        tree_lua_path = os.path.join(POB1_SRC, "TreeData", "3_30", "tree.lua")
+        if not os.path.exists(tree_lua_path):
+            tree_lua_path = os.path.join(POB1_SRC, "TreeData", "3_29", "tree.lua")
+        pob1_nodes = parse_pob_tree_nodes(tree_lua_path)
+        print(f"  PoB1 tree.lua parsed from {os.path.basename(os.path.dirname(tree_lua_path))}: {len(pob1_nodes)} nodes")
 
         # Missing Forbidden Flesh/Flame Ascendant nodes manual glossary
         ascendant_missing = {
@@ -988,28 +998,28 @@ class DictionaryBuilder:
     # --------------------------------------------------------------------------
     def collect_reminder_texts(self):
         print("\n=== Collecting Reminder Texts from Passive Trees ===")
-        rem_path = os.path.join(POE1_TREE_DIR, "Skill Trees", "3.29.0", "reminder-text-ru.json")
-        raw_path = os.path.join(POE1_TREE_DIR, "Skill Trees", "3.29.0", "raw.json")
-
-        rem_ru = load_json(rem_path) or {}
-        raw_nodes = (load_json(raw_path) or {}).get("nodes", {})
-
         count = 0
-        for nid, ru_lines in rem_ru.items():
-            if nid in raw_nodes:
-                en_lines = raw_nodes[nid].get("reminderText", [])
-                if len(en_lines) == len(ru_lines):
-                    for s_en, s_ru in zip(en_lines, ru_lines):
-                        s_en_clean = clean_tags(s_en).strip()
-                        s_ru_clean = clean_tags(s_ru).strip()
-                        if s_en_clean and s_ru_clean:
-                            self.poe1_dict[s_en_clean] = s_ru_clean
-                            if s_en_clean.startswith("(") and s_en_clean.endswith(")"):
-                                self.poe1_dict[s_en_clean[1:-1].strip()] = s_ru_clean.strip("()")
-                            count += 1
-                    if nid in self.poe1_nodes_by_id:
-                        self.poe1_nodes_by_id[nid]["reminder_text_en"] = en_lines
-                        self.poe1_nodes_by_id[nid]["reminder_text_ru"] = ru_lines
+        for tree_ver in ["3.29.0", "3.30.0"]:
+            rem_path = os.path.join(POE1_TREE_DIR, "Skill Trees", tree_ver, "reminder-text-ru.json")
+            raw_path = os.path.join(POE1_TREE_DIR, "Skill Trees", tree_ver, "raw.json")
+            rem_ru = load_json(rem_path) or {}
+            raw_nodes = (load_json(raw_path) or {}).get("nodes", {})
+
+            for nid, ru_lines in rem_ru.items():
+                if nid in raw_nodes:
+                    en_lines = raw_nodes[nid].get("reminderText", [])
+                    if len(en_lines) == len(ru_lines):
+                        for s_en, s_ru in zip(en_lines, ru_lines):
+                            s_en_clean = clean_tags(s_en).strip()
+                            s_ru_clean = clean_tags(s_ru).strip()
+                            if s_en_clean and s_ru_clean:
+                                self.poe1_dict[s_en_clean] = s_ru_clean
+                                if s_en_clean.startswith("(") and s_en_clean.endswith(")"):
+                                    self.poe1_dict[s_en_clean[1:-1].strip()] = s_ru_clean.strip("()")
+                                count += 1
+                        if nid in self.poe1_nodes_by_id:
+                            self.poe1_nodes_by_id[nid]["reminder_text_en"] = en_lines
+                            self.poe1_nodes_by_id[nid]["reminder_text_ru"] = ru_lines
         print(f"  Loaded {count} reminderText pairs for PoE 1")
 
     # --------------------------------------------------------------------------
