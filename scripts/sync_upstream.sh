@@ -32,6 +32,12 @@ sync_repo() {
 
 echo "=== Syncing Upstream Repositories ==="
 sync_repo "PathOfBuilding-PoE1" "https://github.com/PathOfBuildingCommunity/PathOfBuilding.git"
+# Ensure 3.30 tree and GameVersions are present if not yet merged into dev
+if [ ! -d "${UPSTREAM_DIR}/PathOfBuilding-PoE1/src/TreeData/3_30" ] || ! grep -q "3_30" "${UPSTREAM_DIR}/PathOfBuilding-PoE1/src/GameVersions.lua"; then
+    echo "==> Fetching 3.30 tree from PR #10437..."
+    git -C "${UPSTREAM_DIR}/PathOfBuilding-PoE1" fetch origin pull/10437/head:pr-10437 || true
+    git -C "${UPSTREAM_DIR}/PathOfBuilding-PoE1" checkout pr-10437 -- src/TreeData/3_30 src/TreeData/3_30_ruthless src/GameVersions.lua src/Classes/PassiveTree.lua src/Data/ModCache.lua src/Modules/ModParser.lua src/Modules/Utils.lua || true
+fi
 sync_repo "PathOfBuilding-PoE2" "https://github.com/PathOfBuildingCommunity/PathOfBuilding-PoE2.git"
 sync_repo "PathOfBuilding-PoE2-MacOS" "https://github.com/stevep51/PathOfBuilding-PoE2-MacOS.git"
 sync_repo "SimpleGraphic" "https://github.com/PathOfBuildingCommunity/PathOfBuilding-SimpleGraphic.git"
