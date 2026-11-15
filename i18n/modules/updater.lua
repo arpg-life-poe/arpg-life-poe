@@ -204,32 +204,53 @@ function updater.downloadDictionaries(main, launch)
 				failed = true
 				ConPrintf("Failed to download dictionary %s: %s", fileName, err or "Empty")
 			else
-				-- Parse dictionary in-memory and update i18n
+				-- Parse dictionary and update live in-memory tables
 				local chunk = loadstring(resp.body)
 				if chunk then
 					local success, dictTable = pcall(chunk)
 					if success and type(dictTable) == "table" then
 						local i18n = rawget(_G, "i18n")
-						if i18n and i18n.dict then
-							for k, v in pairs(dictTable) do
-								i18n.dict[k] = v
+						if i18n then
+							if fileName == "ui_ru.lua" then
+								i18n.uiDict = dictTable
+								i18n.uiPatterns = dictTable.patterns or {}
+								package.loaded["i18n.dictionaries.ui_ru"] = dictTable
+							elseif fileName == "affix_templates.lua" then
+								i18n.templates = dictTable
+								package.loaded["i18n.dictionaries.affix_templates"] = dictTable
+							elseif fileName == dictGameFile then
+								i18n.gameDict = dictTable
+								local modName = isPoE2 and "i18n.dictionaries.poe2_ru" or "i18n.dictionaries.poe1_ru"
+								package.loaded[modName] = dictTable
 							end
-							ConPrintf("Successfully updated %s in-memory (%d keys)", fileName, #dictTable)
+							i18n.memo = {}
+							i18n.memoCount = 0
+							ConPrintf("Successfully applied updated dictionary %s in-memory", fileName)
 						end
 					end
 				end
 
-				-- Try saving to disk if writable
+				-- Persist dictionary to user application directory
 				pcall(function()
-					local path = "src/i18n/dictionaries/" .. fileName
-					local f = io.open(path, "w")
-					if not f then
-						path = "i18n/dictionaries/" .. fileName
-						f = io.open(path, "w")
+					local userDir = _G.GetUserPath and _G.GetUserPath()
+					if userDir then
+						if _G.MakeDir then
+							_G.MakeDir(userDir .. "/i18n")
+							_G.MakeDir(userDir .. "/i18n/dictionaries")
+						end
+						local f = io.open(userDir .. "/i18n/dictionaries/" .. fileName, "w")
+						if f then
+							f:write(resp.body)
+							f:close()
+						end
 					end
-					if f then
-						f:write(resp.body)
-						f:close()
+					local scriptDir = _G.GetScriptPath and _G.GetScriptPath()
+					if scriptDir then
+						local f2 = io.open(scriptDir .. "/i18n/dictionaries/" .. fileName, "w")
+						if f2 then
+							f2:write(resp.body)
+							f2:close()
+						end
 					end
 				end)
 			end
@@ -242,12 +263,12 @@ function updater.downloadDictionaries(main, launch)
 				else
 					local i18n = rawget(_G, "i18n")
 					if i18n and i18n.init then
-						i18n.init()
+						i18n.init(isPoE2 and "poe2" or "poe1")
 					end
 					updater.updateAvailable = false
 					launch.arpgUpdateAvailable = false
 					if main and main.OpenMessagePopup then
-						main:OpenMessagePopup("Словари обновлены", "^x50E050Все словари успешно обновлены до последней версии!\n^7Перевод интерфейса и базы предметов актуализирован.")
+						main:OpenMessagePopup("Словари обновлены", "^x50E050Все словари успешно обновлены!\n^7Перевод интерфейса и базы предметов актуализирован без перезапуска приложения.")
 					end
 				end
 			end

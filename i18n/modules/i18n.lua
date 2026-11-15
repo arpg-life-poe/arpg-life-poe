@@ -14,28 +14,54 @@ i18n.gameDict = {}
 i18n.uiPatterns = {}
 i18n.templates = {}
 i18n.memo = {}
+i18n.memoCount = 0
+i18n.lastGameVersion = nil
 i18n.isHooked = false
+
+-- Safe loader: checks GetUserPath() (persistent updates) before packaged modules
+local function loadDict(moduleName, fileName)
+	local userPath = _G.GetUserPath and _G.GetUserPath()
+	if userPath then
+		local userFile = userPath .. "/i18n/dictionaries/" .. fileName
+		local f = io.open(userFile, "r")
+		if f then
+			local content = f:read("*a")
+			f:close()
+			if content and #content > 0 then
+				local chunk = loadstring(content)
+				if chunk then
+					local ok, tbl = pcall(chunk)
+					if ok and type(tbl) == "table" then
+						return tbl
+					end
+				end
+			end
+		end
+	end
+
+	local ok, tbl = pcall(require, moduleName)
+	if ok and type(tbl) == "table" then
+		return tbl
+	end
+	return {}
+end
 
 -- Load dictionaries safely
 function i18n.init(gameVersion)
-	local uiOk, uiTable = pcall(require, "i18n.dictionaries.ui_ru")
-	if uiOk and type(uiTable) == "table" then
-		i18n.uiDict = uiTable
-		i18n.uiPatterns = uiTable.patterns or {}
-	end
+	i18n.lastGameVersion = gameVersion or i18n.lastGameVersion or "poe1"
 
-	local tmplOk, tmplTable = pcall(require, "i18n.dictionaries.affix_templates")
-	if tmplOk and type(tmplTable) == "table" then
-		i18n.templates = tmplTable
-	end
+	i18n.uiDict = loadDict("i18n.dictionaries.ui_ru", "ui_ru.lua")
+	i18n.uiPatterns = i18n.uiDict.patterns or {}
 
-	local gameDictName = (gameVersion == "poe2" or gameVersion == 2) and "i18n.dictionaries.poe2_ru" or "i18n.dictionaries.poe1_ru"
-	local gameOk, gameTable = pcall(require, gameDictName)
-	if gameOk and type(gameTable) == "table" then
-		i18n.gameDict = gameTable
-	end
+	i18n.templates = loadDict("i18n.dictionaries.affix_templates", "affix_templates.lua")
+
+	local isPoE2 = (i18n.lastGameVersion == "poe2" or i18n.lastGameVersion == 2)
+	local gameDictMod = isPoE2 and "i18n.dictionaries.poe2_ru" or "i18n.dictionaries.poe1_ru"
+	local gameDictFile = isPoE2 and "poe2_ru.lua" or "poe1_ru.lua"
+	i18n.gameDict = loadDict(gameDictMod, gameDictFile)
 
 	i18n.memo = {}
+	i18n.memoCount = 0
 end
 
 function i18n.setLanguage(lang)
@@ -145,6 +171,12 @@ local translateLine
 
 local function translateToken(token)
 	if not token or #token == 0 then
+		return token
+	end
+
+	-- Fast filters to avoid expensive regex/template matching on non-translatable text
+	local len = #token
+	if len > 200 or token:find("^https?://") or token:find("^eN") or not token:find("%a") or token:find("[\208\209]") then
 		return token
 	end
 
@@ -386,6 +418,18 @@ function i18n.translate(text)
 		return cached
 	end
 
+	local len = #text
+	-- Fast skip for long texts (Base64 codes, XML documents, stack traces, data dumps)
+	if len > 250 or text:find("^https?://") or text:find("^eN") or text:find("^%s*<") or not text:find("%a") or text:find("[\208\209]") then
+		if (i18n.memoCount or 0) > 25000 then
+			i18n.memo = {}
+			i18n.memoCount = 0
+		end
+		i18n.memo[text] = text
+		i18n.memoCount = (i18n.memoCount or 0) + 1
+		return text
+	end
+
 	local result
 	if text:find("\n", 1, true) then
 		-- Multi-line string
@@ -400,7 +444,12 @@ function i18n.translate(text)
 		result = translateLine(text)
 	end
 
+	if (i18n.memoCount or 0) > 25000 then
+		i18n.memo = {}
+		i18n.memoCount = 0
+	end
 	i18n.memo[text] = result
+	i18n.memoCount = (i18n.memoCount or 0) + 1
 	return result
 end
 

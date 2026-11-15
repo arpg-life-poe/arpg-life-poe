@@ -73,6 +73,8 @@ enum CurlOption {
     CurlOptProxy,
     CurlOptSslVerifyPeer,
     CurlOptSslVerifyHost,
+    CurlOptTimeout,
+    CurlOptConnectTimeout,
 };
 
 enum CurlInfo {
@@ -732,26 +734,24 @@ std::vector<unsigned char> rawDeflate(const std::string& input) {
     return out;
 }
 
-std::vector<unsigned char> rawInflate(const std::string& input) {
-    if (input.empty()) {
-        return {};
-    }
+static bool doInflate(const std::string& input, int windowBits, std::vector<unsigned char>& out) {
     z_stream stream{};
     stream.next_in = reinterpret_cast<Bytef*>(const_cast<char*>(input.data()));
     stream.avail_in = static_cast<uInt>(input.size());
-    if (inflateInit(&stream) != Z_OK) {
-        return {};
+    if (inflateInit2(&stream, windowBits) != Z_OK) {
+        return false;
     }
     size_t outSz = input.size() * 4;
-    std::vector<unsigned char> out(outSz);
+    if (outSz < 1024) outSz = 1024;
+    out.resize(outSz);
     stream.next_out = out.data();
     stream.avail_out = static_cast<uInt>(outSz);
     int err = Z_OK;
     while ((err = inflate(&stream, Z_NO_FLUSH)) == Z_OK) {
         if (stream.avail_out == 0) {
-            if (outSz > 128ull << 20) {
+            if (outSz > (128ull << 20)) {
                 inflateEnd(&stream);
-                return {};
+                return false;
             }
             const size_t oldSz = outSz;
             outSz *= 2;
@@ -761,11 +761,31 @@ std::vector<unsigned char> rawInflate(const std::string& input) {
         }
     }
     inflateEnd(&stream);
-    if (err != Z_STREAM_END) {
+    if (err == Z_STREAM_END) {
+        out.resize(stream.total_out);
+        return true;
+    }
+    return false;
+}
+
+std::vector<unsigned char> rawInflate(const std::string& input) {
+    if (input.empty()) {
         return {};
     }
-    out.resize(stream.total_out);
-    return out;
+    std::vector<unsigned char> out;
+    // 1. Try automatic zlib/gzip header detection (MAX_WBITS + 32)
+    if (doInflate(input, MAX_WBITS + 32, out)) {
+        return out;
+    }
+    // 2. Try raw deflate without header (-MAX_WBITS)
+    if (doInflate(input, -MAX_WBITS, out)) {
+        return out;
+    }
+    // 3. Fallback to standard zlib (MAX_WBITS)
+    if (doInflate(input, MAX_WBITS, out)) {
+        return out;
+    }
+    return {};
 }
 }
 
@@ -1142,6 +1162,8 @@ void Host::registerPreloadModules() {
         lua_pushinteger(L, CurlOptProxy); lua_setfield(L, -2, "OPT_PROXY");
         lua_pushinteger(L, CurlOptSslVerifyPeer); lua_setfield(L, -2, "OPT_SSL_VERIFYPEER");
         lua_pushinteger(L, CurlOptSslVerifyHost); lua_setfield(L, -2, "OPT_SSL_VERIFYHOST");
+        lua_pushinteger(L, CurlOptTimeout); lua_setfield(L, -2, "OPT_TIMEOUT");
+        lua_pushinteger(L, CurlOptConnectTimeout); lua_setfield(L, -2, "OPT_CONNECTTIMEOUT");
         lua_pushinteger(L, CurlInfoResponseCode); lua_setfield(L, -2, "INFO_RESPONSE_CODE");
         lua_pushinteger(L, CurlInfoSizeDownload); lua_setfield(L, -2, "INFO_SIZE_DOWNLOAD");
         lua_pushinteger(L, CurlInfoRedirectUrl); lua_setfield(L, -2, "INFO_REDIRECT_URL");
@@ -1220,8 +1242,19 @@ void Host::registerPreloadModules() {
                     case CurlOptPostFields:
                         curl_easy_setopt(easy->curl, CURLOPT_POSTFIELDS, luaL_checkstring(L, 3));
                         break;
-                    case CurlOptIpResolve:
-                        curl_easy_setopt(easy->curl, CURLOPT_IPRESOLVE, static_cast<long>(luaL_checkinteger(L, 3)));
+                    case CurlOptIpResolve: {
+                        long resolve = static_cast<long>(luaL_checkinteger(L, 3));
+                        if (resolve == 0) {
+                            resolve = CURL_IPRESOLVE_V4;
+                        }
+                        curl_easy_setopt(easy->curl, CURLOPT_IPRESOLVE, resolve);
+                        break;
+                    }
+                    case CurlOptTimeout:
+                        curl_easy_setopt(easy->curl, CURLOPT_TIMEOUT, static_cast<long>(luaL_checkinteger(L, 3)));
+                        break;
+                    case CurlOptConnectTimeout:
+                        curl_easy_setopt(easy->curl, CURLOPT_CONNECTTIMEOUT, static_cast<long>(luaL_checkinteger(L, 3)));
                         break;
                     case CurlOptProxy:
                         curl_easy_setopt(easy->curl, CURLOPT_PROXY, luaL_checkstring(L, 3));
@@ -1343,6 +1376,10 @@ void Host::registerPreloadModules() {
             easy->curl = curl_easy_init();
             curl_easy_setopt(easy->curl, CURLOPT_FOLLOWLOCATION, 1L);
             curl_easy_setopt(easy->curl, CURLOPT_ACCEPT_ENCODING, "");
+            // Default to IPv4 to prevent 2-minute hangs on broken/unrouted IPv6 setups
+            curl_easy_setopt(easy->curl, CURLOPT_IPRESOLVE, CURL_IPRESOLVE_V4);
+            curl_easy_setopt(easy->curl, CURLOPT_CONNECTTIMEOUT, 8L);
+            curl_easy_setopt(easy->curl, CURLOPT_TIMEOUT, 30L);
             luaL_getmetatable(L, "PoB.CurlEasy");
             lua_setmetatable(L, -2);
             return 1;
@@ -1351,7 +1388,9 @@ void Host::registerPreloadModules() {
 
         return 1;
     });
-    lua_setfield(L, -2, "lcurl.safe");
+    lua_pushvalue(L, -1);
+    lua_setfield(L, -3, "lcurl.safe");
+    lua_setfield(L, -2, "lcurl");
 
     lua_pushcfunction(L, [](lua_State* L) -> int {
         lua_newtable(L);
@@ -1656,6 +1695,18 @@ void Host::pumpEvents() {
         } else if (event.type == SDL_EVENT_KEY_DOWN || event.type == SDL_EVENT_KEY_UP) {
             setModifierStates(keyState);
             std::string key = keyNameFromSdl(event.key.key);
+            // On macOS with Russian or other non-Latin layouts, event.key.key is non-ASCII.
+            // For shortcuts (Cmd+V, Cmd+C, Cmd+A, Cmd+Z, etc.), map by physical scancode!
+            if (key.empty() || keyState.count("CTRL") > 0) {
+                SDL_Scancode sc = event.key.scancode;
+                if (sc >= SDL_SCANCODE_A && sc <= SDL_SCANCODE_Z) {
+                    key = std::string(1, static_cast<char>('a' + (sc - SDL_SCANCODE_A)));
+                } else if (sc >= SDL_SCANCODE_1 && sc <= SDL_SCANCODE_9) {
+                    key = std::string(1, static_cast<char>('1' + (sc - SDL_SCANCODE_1)));
+                } else if (sc == SDL_SCANCODE_0) {
+                    key = "0";
+                }
+            }
             if (!key.empty()) {
                 if (event.type == SDL_EVENT_KEY_DOWN) {
                     keyState.insert(key);

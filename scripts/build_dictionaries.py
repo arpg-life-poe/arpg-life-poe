@@ -571,9 +571,12 @@ class DictionaryBuilder:
             self.items_bases_uniques_map[en] = ru
 
         # 2. Uniques
-        uniques1 = load_json(os.path.join(POE_TOOLTIP_DIR, "poe1_unique_items.json")) or []
-        uniques_allflame = load_json(os.path.join(POE_TOOLTIP_DIR, "poe1_unique_items_3_29_allflame.json")) or []
-        for u in (uniques1 + uniques_allflame):
+        uniques_merged = []
+        for upath in sorted(glob.glob(os.path.join(POE_TOOLTIP_DIR, "poe1_unique_items*.json"))):
+            ulist = load_json(upath) or []
+            if isinstance(ulist, list):
+                uniques_merged.extend(ulist)
+        for u in uniques_merged:
             if isinstance(u, dict):
                 en = u.get("englishName", "").strip()
                 ru = u.get("nameRu", "").strip()
@@ -696,6 +699,62 @@ class DictionaryBuilder:
 
         print(f"  PoE 1 Node Names direct match: {matched_pob1_names}/{total_pob1_names} ({matched_pob1_names/total_pob1_names*100:.1f}%)")
         print(f"  PoE 1 Node Stats direct match: {matched_pob1_stats}/{total_pob1_stats} ({matched_pob1_stats/total_pob1_stats*100:.1f}%)")
+
+        # 6. PoEDB 3.30.0 (Covens of Umbra) delta & full EN/RU sync
+        poedb_330_path = os.path.join(ROOT_DIR, "i18n", "sources_330", "poedb_330_ru_en.json")
+        poedb_330 = load_json(poedb_330_path)
+        if isinstance(poedb_330, dict):
+            c_gems = c_uniq = c_items = c_mods = 0
+            for g in (poedb_330.get("gems") or {}).values():
+                en = (g.get("name_en") or "").strip()
+                ru = (g.get("name_ru") or "").strip()
+                if en and ru:
+                    self.poe1_dict[en] = ru
+                    self.poe1_gems_map[en] = ru
+                    if norm_key(en) != en:
+                        self.poe1_dict[norm_key(en)] = ru
+                        self.poe1_gems_map[norm_key(en)] = ru
+                    if en.endswith(" Support"):
+                        base = en[:-8].strip()
+                        self.poe1_dict[base] = ru
+                        self.poe1_gems_map[base] = ru
+                    c_gems += 1
+            for u in (poedb_330.get("uniques") or {}).values():
+                en = (u.get("name_en") or "").strip()
+                ru = (u.get("name_ru") or "").strip()
+                if en and ru:
+                    self.poe1_dict[en] = ru
+                    self.items_bases_uniques_map[en] = ru
+                    if norm_key(en) != en:
+                        self.poe1_dict[norm_key(en)] = ru
+                        self.items_bases_uniques_map[norm_key(en)] = ru
+                    self.poe1_dict[f"Replica {en}"] = f"Копия {ru}"
+                    self.items_bases_uniques_map[f"Replica {en}"] = f"Копия {ru}"
+                    c_uniq += 1
+                b_en = (u.get("base_en") or "").strip()
+                b_ru = (u.get("base_ru") or "").strip()
+                if b_en and b_ru:
+                    self.poe1_dict[b_en] = b_ru
+                    self.items_bases_uniques_map[b_en] = b_ru
+            for it in (poedb_330.get("items_330") or {}).values():
+                en = (it.get("name_en") or "").strip()
+                ru = (it.get("name_ru") or "").strip()
+                if en and ru:
+                    self.poe1_dict[en] = ru
+                    self.items_bases_uniques_map[en] = ru
+                    if norm_key(en) != en:
+                        self.poe1_dict[norm_key(en)] = ru
+                        self.items_bases_uniques_map[norm_key(en)] = ru
+                    c_items += 1
+            for pair in (poedb_330.get("mod_pairs") or []):
+                if isinstance(pair, list) and len(pair) == 2:
+                    m_en = clean_tags(pair[0]).strip()
+                    m_ru = clean_tags(pair[1]).strip()
+                    if m_en and m_ru:
+                        self.poe1_dict[m_en] = m_ru
+                        self.add_affix_template(m_en, m_ru, game="poe1")
+                        c_mods += 1
+            print(f"  PoEDB 3.30.0 sync: gems={c_gems}, uniques={c_uniq}, items_330={c_items}, mod_pairs={c_mods}")
 
     # --------------------------------------------------------------------------
     # Build PoE 2 Data & Tree Mapping
