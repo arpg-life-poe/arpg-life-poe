@@ -1,10 +1,10 @@
 {
-  "updated_at": "2026-11-13T05:30:48.378659+00:00",
+  "updated_at": "2026-11-15T03:23:36.093783+00:00",
   "poe1": {
     "repository": "https://github.com/PathOfBuildingCommunity/PathOfBuilding.git",
     "branch": "dev",
-    "commit": "a69391d6daaaea1aaf8054668a094aad88dd7eaa",
-    "commit_short": "a69391d",
+    "commit": "6d1d39837b0d5b0f4a3ede05d06b7594bdbcc556",
+    "commit_short": "6d1d398",
     "commit_date": "2026-11-10T14:27:16+13:00",
     "commit_subject": "Update DLLs to SimpleGraphic-v2.5.6 (#10425)",
     "latest_release_tag": "v2.67.2",
