@@ -58,6 +58,16 @@ function launch:ApplyUpdate(mode) end
 '''
     content += "\n" + updater_disable
 
+    # 4. Guard OnSubError and OnSubFinished against nil subscript handles
+    content = content.replace(
+        'function launch:OnSubError(id, errMsg)\n\tif self.subScripts[id].type == "UPDATE" then',
+        'function launch:OnSubError(id, errMsg)\n\tif not self.subScripts[id] then return end\n\tif self.subScripts[id].type == "UPDATE" then'
+    )
+    content = content.replace(
+        'function launch:OnSubFinished(id, ...)\n\tif self.subScripts[id].type == "UPDATE" then',
+        'function launch:OnSubFinished(id, ...)\n\tif not self.subScripts[id] then return end\n\tif self.subScripts[id].type == "UPDATE" then'
+    )
+
     with open(launch_path, "w", encoding="utf-8") as f:
         f.write(content)
 

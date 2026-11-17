@@ -457,7 +457,7 @@ struct SubScriptWorker {
                 lua_getfield(mainL, LUA_REGISTRYINDEX, mainObjectKey);
                 lua_getfield(mainL, -1, "OnSubError");
                 lua_insert(mainL, -2);
-                lua_pushlightuserdata(mainL, reinterpret_cast<void*>(slot));
+                lua_pushlightuserdata(mainL, reinterpret_cast<void*>(slot + 1));
                 lua_pushstring(mainL, errCopy.c_str());
                 if (lua_pcall(mainL, 3, 0, 0) != LUA_OK) {
                     std::fprintf(stderr, "OnSubError error: %s\n", lua_tostring(mainL, -1));
@@ -466,7 +466,7 @@ struct SubScriptWorker {
                 lua_getfield(mainL, LUA_REGISTRYINDEX, mainObjectKey);
                 lua_getfield(mainL, -1, "OnSubFinished");
                 lua_insert(mainL, -2);
-                lua_pushlightuserdata(mainL, reinterpret_cast<void*>(slot));
+                lua_pushlightuserdata(mainL, reinterpret_cast<void*>(slot + 1));
                 for (const auto& value : returnValues) {
                     pushValue(mainL, value);
                 }
@@ -489,7 +489,10 @@ struct SubScriptManager::Impl {
     std::vector<std::unique_ptr<SubScriptWorker>> scripts;
 
     SubScriptWorker* find(void* id) {
-        const size_t slot = reinterpret_cast<size_t>(id);
+        if (!id) {
+            return nullptr;
+        }
+        const size_t slot = reinterpret_cast<size_t>(id) - 1;
         if (slot >= scripts.size() || !scripts[slot]) {
             return nullptr;
         }
@@ -578,15 +581,15 @@ void* SubScriptManager::launch(lua_State* mainL) {
     }
 
     impl->scripts[slot] = std::move(script);
-    lua_pushlightuserdata(mainL, reinterpret_cast<void*>(slot));
-    return reinterpret_cast<void*>(slot);
+    lua_pushlightuserdata(mainL, reinterpret_cast<void*>(slot + 1));
+    return reinterpret_cast<void*>(slot + 1);
 }
 
 void SubScriptManager::abort(void* id) {
-    if (!impl) {
+    if (!impl || !id) {
         return;
     }
-    const size_t slot = reinterpret_cast<size_t>(id);
+    const size_t slot = reinterpret_cast<size_t>(id) - 1;
     if (slot < impl->scripts.size() && impl->scripts[slot]) {
         impl->scripts[slot]->stopWorker();
         impl->scripts[slot].reset();
