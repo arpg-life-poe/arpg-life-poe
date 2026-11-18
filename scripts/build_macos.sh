@@ -37,6 +37,10 @@ for pkg in sdl3 luajit libzstd; do
   fi
 done
 
+# Ensure upstream version metadata and version.lua are up to date
+echo "==> Syncing version metadata and version.lua..."
+python3 "${ROOT_DIR}/scripts/check_upstream.py" --local-sync || true
+
 # Ensure dictionaries are generated and up to date
 echo "==> Updating translation dictionaries..."
 python3 "${ROOT_DIR}/scripts/build_dictionaries.py"

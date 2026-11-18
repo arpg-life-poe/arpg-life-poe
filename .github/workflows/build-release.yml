@@ -53,7 +53,7 @@ jobs:
         run: |
           git config user.name "vlad1116"
           git config user.email "75042578+vlad1116@users.noreply.github.com"
-          git add upstream-versions.json
+          git add upstream-versions.json i18n/version.lua
           git commit -m "Auto-update upstream versions [skip ci]"
           git push origin main
 
@@ -193,12 +193,15 @@ jobs:
           *Сборка обновлена: TIMESTAMP*
           EOF
           sed -i "s/TIMESTAMP/$DATE/g" release_notes.md
+          POE1_VER=$(python3 -c "import json; d=json.load(open('upstream-versions.json')); print(d.get('poe1',{}).get('version', '2.68.1'))")
+          echo "RELEASE_TAG=v${POE1_VER}" >> $GITHUB_ENV
+          echo "RELEASE_NAME=Path of Building — ARPG-Life Edition (v${POE1_VER})" >> $GITHUB_ENV
 
       - name: Publish Release to GitHub
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v2026.11.13
-          name: "Path of Building — ARPG-Life Edition"
+          tag_name: ${{ env.RELEASE_TAG }}
+          name: ${{ env.RELEASE_NAME }}
           body_path: release_notes.md
           prerelease: false
           make_latest: "true"
