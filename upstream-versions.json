@@ -1,12 +1,12 @@
 {
-  "updated_at": "2026-11-18T11:56:35.643210+00:00",
+  "updated_at": "2026-11-19T04:42:52.722073+00:00",
   "poe1": {
     "repository": "https://github.com/PathOfBuildingCommunity/PathOfBuilding.git",
     "branch": "dev",
-    "commit": "a41fec6c20f822a658ae5df1273e8c69d5969bac",
-    "commit_short": "a41fec6c2",
-    "commit_date": "2026-11-17T02:07:49-06:00",
-    "commit_subject": "Update manifest for 2.68.1",
+    "commit": "61641fdfaa7569c924056898e0d36f066e413e9b",
+    "commit_short": "61641fd",
+    "commit_date": "2026-11-19T04:00:04Z",
+    "commit_subject": "Fix inverted negative resistance exceeding the enemy's maximum resistance (#10492)",
     "latest_release_tag": "v2.68.1",
     "simple_graphic_version": "v2.5.6",
     "version": "2.68.1"
@@ -16,7 +16,7 @@
     "branch": "dev",
     "commit": "601768bd105869618c3d6581b883e5d7aeec91b2",
     "commit_short": "601768bd1",
-    "commit_date": "2026-11-10T14:28:18+13:00",
+    "commit_date": "2026-11-10T01:28:18Z",
     "commit_subject": "Update DLLs to SimpleGraphic-v2.5.6 (#2586)",
     "latest_release_tag": "v2.49.3",
     "simple_graphic_version": "v2.5.6",
@@ -27,7 +27,7 @@
     "branch": "master",
     "commit": "421d18871cccb2696b5a57e6d72a9fc22fa641ae",
     "commit_short": "421d188",
-    "commit_date": "2026-11-09T23:27:31+01:00",
+    "commit_date": "2026-11-09T22:27:31Z",
     "commit_subject": "Merge pull request #121 from zao/feat/bump-deps-nov",
     "latest_release_tag": "v2.5.6"
   }
