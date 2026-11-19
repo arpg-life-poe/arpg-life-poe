@@ -1,12 +1,12 @@
 {
-  "updated_at": "2026-11-19T04:42:52.722073+00:00",
+  "updated_at": "2026-11-19T14:46:24.971149+00:00",
   "poe1": {
     "repository": "https://github.com/PathOfBuildingCommunity/PathOfBuilding.git",
     "branch": "dev",
-    "commit": "61641fdfaa7569c924056898e0d36f066e413e9b",
-    "commit_short": "61641fd",
-    "commit_date": "2026-11-19T04:00:04Z",
-    "commit_subject": "Fix inverted negative resistance exceeding the enemy's maximum resistance (#10492)",
+    "commit": "343b054ce6f6d9abab9e101d17cd27e2cf15f8a5",
+    "commit_short": "343b054",
+    "commit_date": "2026-11-19T07:05:31Z",
+    "commit_subject": "Use stable iteration order for guards (#10489)",
     "latest_release_tag": "v2.68.1",
     "simple_graphic_version": "v2.5.6",
     "version": "2.68.1"
