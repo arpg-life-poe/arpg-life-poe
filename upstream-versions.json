@@ -1,12 +1,12 @@
 {
-  "updated_at": "2026-11-19T14:46:24.971149+00:00",
+  "updated_at": "2026-11-22T22:54:23.078920+00:00",
   "poe1": {
     "repository": "https://github.com/PathOfBuildingCommunity/PathOfBuilding.git",
     "branch": "dev",
-    "commit": "343b054ce6f6d9abab9e101d17cd27e2cf15f8a5",
-    "commit_short": "343b054",
-    "commit_date": "2026-11-19T07:05:31Z",
-    "commit_subject": "Use stable iteration order for guards (#10489)",
+    "commit": "c26c517c4f237eeffbc8ff2588330469fe3b0cf2",
+    "commit_short": "c26c517",
+    "commit_date": "2026-11-22T22:29:14Z",
+    "commit_subject": "Add Fleshrend stacks config for Pact of Ghorr (#10531)",
     "latest_release_tag": "v2.68.1",
     "simple_graphic_version": "v2.5.6",
     "version": "2.68.1"
