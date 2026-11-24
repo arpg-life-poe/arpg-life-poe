@@ -1,15 +1,15 @@
 {
-  "updated_at": "2026-11-23T04:17:51.648883+00:00",
+  "updated_at": "2026-11-24T16:34:55.491629+00:00",
   "poe1": {
     "repository": "https://github.com/PathOfBuildingCommunity/PathOfBuilding.git",
     "branch": "dev",
-    "commit": "f4a77c58986b68f75764f6bedf3593911faff85b",
-    "commit_short": "f4a77c5",
+    "commit": "5606cc64fa9f15694e69001a52b90aa968d01a86",
+    "commit_short": "5606cc6",
     "commit_date": "2026-11-23T03:38:28Z",
     "commit_subject": "Fix error popup not working when the program crashes too early (#10522)",
     "latest_release_tag": "v2.68.1",
     "simple_graphic_version": "v2.5.6",
-    "version": "2.68.1"
+    "version": "2.69.0"
   },
   "poe2": {
     "repository": "https://github.com/PathOfBuildingCommunity/PathOfBuilding-PoE2.git",

@@ -9,13 +9,13 @@
 
 local version = {
 	edition = "ARPG-Life Edition",
-	version = "2.68.1-arpg1",
-	buildDate = "2026-11-23",
-	upstreamCommitPoE1 = "f4a77c5",
+	version = "2.69.0-arpg1",
+	buildDate = "2026-11-24",
+	upstreamCommitPoE1 = "5606cc6",
 	upstreamCommitPoE2 = "601768bd1",
 	upstreamTagPoE1 = "v2.68.1",
 	upstreamTagPoE2 = "v2.49.3",
-	versionPoE1 = "2.68.1",
+	versionPoE1 = "2.69.0",
 	versionPoE2 = "0.23.1",
 	checkURL = "https://raw.githubusercontent.com/arpg-life-poe/arpg-life-poe/main/upstream-versions.json",
 	releasesURL = "https://github.com/arpg-life-poe/arpg-life-poe/releases",
