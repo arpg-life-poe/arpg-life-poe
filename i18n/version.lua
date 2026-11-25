@@ -10,10 +10,10 @@
 local version = {
 	edition = "ARPG-Life Edition",
 	version = "2.69.0-arpg1",
-	buildDate = "2026-11-24",
+	buildDate = "2026-11-25",
 	upstreamCommitPoE1 = "5606cc6",
 	upstreamCommitPoE2 = "601768bd1",
-	upstreamTagPoE1 = "v2.68.1",
+	upstreamTagPoE1 = "v2.69.0",
 	upstreamTagPoE2 = "v2.49.3",
 	versionPoE1 = "2.69.0",
 	versionPoE2 = "0.23.1",
