@@ -142,8 +142,8 @@ def generate_version_lua(data):
     poe2 = data.get("poe2", {})
     ver_p1 = poe1.get("version") or (poe1.get("latest_release_tag", "").lstrip("v")) or "2.68.1"
     ver_p2 = poe2.get("version") or (poe2.get("latest_release_tag", "").lstrip("v")) or "0.23.1"
-    commit_p1 = poe1.get("commit_short", "a41fec6")
-    commit_p2 = poe2.get("commit_short", "601768b")
+    commit_p1 = str(poe1.get("commit_short", "5606cc6"))[:7]
+    commit_p2 = str(poe2.get("commit_short", "601768b"))[:7]
     tag_p1 = poe1.get("latest_release_tag", f"v{ver_p1}")
     tag_p2 = poe2.get("latest_release_tag", f"v{ver_p2}")
     date_str = (data.get("updated_at") or datetime.now(timezone.utc).isoformat())[:10]

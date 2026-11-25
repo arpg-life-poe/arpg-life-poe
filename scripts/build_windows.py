@@ -58,11 +58,14 @@ def build_windows(game_type, custom_dll_path=None):
         subprocess.call([sys.executable, str(SCRIPTS_DIR / "check_upstream.py"), "--local-sync"])
     except Exception as e:
         print(f"Warning: check_upstream failed: {e}")
-    print("Ensuring translation dictionaries are up to date...")
-    try:
-        subprocess.call([sys.executable, str(SCRIPTS_DIR / "build_dictionaries.py")])
-    except Exception as e:
-        print(f"Warning: build_dictionaries failed: {e}")
+    if os.path.isdir("/Users/vlad1116/Мой диск/poe/parsers/data"):
+        print("Ensuring translation dictionaries are up to date from local datasets...")
+        try:
+            subprocess.call([sys.executable, str(SCRIPTS_DIR / "build_dictionaries.py")])
+        except Exception as e:
+            print(f"Warning: build_dictionaries failed: {e}")
+    else:
+        print("Using pre-built translation dictionaries from repository...")
 
     upstream_repo = UPSTREAM_DIR / ("PathOfBuilding-PoE1" if game_type == "poe1" else "PathOfBuilding-PoE2")
     if not upstream_repo.exists():

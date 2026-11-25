@@ -41,9 +41,13 @@ done
 echo "==> Syncing version metadata and version.lua..."
 python3 "${ROOT_DIR}/scripts/check_upstream.py" --local-sync || true
 
-# Ensure dictionaries are generated and up to date
-echo "==> Updating translation dictionaries..."
-python3 "${ROOT_DIR}/scripts/build_dictionaries.py"
+# Ensure dictionaries are generated and up to date (only if local source datasets exist)
+if [ -d "/Users/vlad1116/Мой диск/poe/parsers/data" ]; then
+  echo "==> Updating translation dictionaries from local datasets..."
+  python3 "${ROOT_DIR}/scripts/build_dictionaries.py"
+else
+  echo "==> Using pre-built translation dictionaries from repository..."
+fi
 
 build_target() {
   local GAME="$1"

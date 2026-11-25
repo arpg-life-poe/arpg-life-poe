@@ -303,6 +303,16 @@ class DictionaryBuilder:
         for en, ru in t_json.items():
             self.add_affix_template(en, ru, game="poe1")
 
+        # 4.5. pair-affixes.json from parsers/data
+        pair_json = load_json(os.path.join(POE_PARSER_DATA, "pair-affixes.json")) or {}
+        count_pairs = 0
+        for en, ru in pair_json.items():
+            if en and ru:
+                self.add_affix_template(en, ru, game="poe1")
+                count_pairs += 1
+        if count_pairs:
+            print(f"  Loaded {count_pairs} affix template pairs from pair-affixes.json")
+
         # 5. Handcrafted PoE 2 Regex Stat Patterns from statTranslator.ts
         poe2_patterns = [
             ("+{value} to Strength", "+{value} к силе"),
@@ -756,6 +766,51 @@ class DictionaryBuilder:
                         c_mods += 1
             print(f"  PoEDB 3.30.0 sync: gems={c_gems}, uniques={c_uniq}, items_330={c_items}, mod_pairs={c_mods}")
 
+        # 7. Custom Translations from poe1-passive-tree
+        custom_trans_path = os.path.join(POE1_TREE_DIR, "src", "tree", "custom_translations.json")
+        custom_trans = load_json(custom_trans_path) or {}
+        ct_names = ct_stats = 0
+        for en_name, ru_name in (custom_trans.get("names") or {}).items():
+            if en_name and ru_name:
+                self.poe1_dict[en_name.strip()] = ru_name.strip()
+                if norm_key(en_name) != en_name:
+                    self.poe1_dict[norm_key(en_name)] = ru_name.strip()
+                ct_names += 1
+        for en_stat, ru_stat in (custom_trans.get("stats") or {}).items():
+            if en_stat and ru_stat:
+                self.poe1_dict[en_stat.strip()] = ru_stat.strip()
+                self.add_affix_template(en_stat.strip(), ru_stat.strip(), game="poe1")
+                ct_stats += 1
+        if ct_names or ct_stats:
+            print(f"  Loaded custom_translations: names={ct_names}, stats={ct_stats}")
+
+        # 8. PoE 1 Atlas Tree Translations
+        atlas_ru_path = "/Users/vlad1116/Мой диск/poe/poe1-atlas-tree/public/tree/atlas/data_ru.json"
+        atlas_en_path = "/Users/vlad1116/Мой диск/poe/poe1-atlas-tree/public/tree/atlas/data_en.json"
+        if os.path.exists(atlas_ru_path) and os.path.exists(atlas_en_path):
+            a_ru = load_json(atlas_ru_path) or {}
+            a_en = load_json(atlas_en_path) or {}
+            ru_nodes = a_ru.get("nodes", {})
+            en_nodes = a_en.get("nodes", {})
+            c_atlas = 0
+            for nid, rnode in ru_nodes.items():
+                enode = en_nodes.get(nid, {})
+                ename = (enode.get("name") or "").strip()
+                rname = (rnode.get("name") or "").strip()
+                if ename and rname:
+                    self.poe1_dict[ename] = rname
+                    c_atlas += 1
+                estats = enode.get("stats") or []
+                rstats = rnode.get("stats") or []
+                if len(estats) == len(rstats):
+                    for es, rs in zip(estats, rstats):
+                        es_clean = clean_tags(es).strip()
+                        rs_clean = clean_tags(rs).strip()
+                        if es_clean and rs_clean:
+                            self.poe1_dict[es_clean] = rs_clean
+                            self.add_affix_template(es_clean, rs_clean, game="poe1")
+            print(f"  Loaded Atlas tree nodes: {c_atlas}")
+
     # --------------------------------------------------------------------------
     # Build PoE 2 Data & Tree Mapping
     # --------------------------------------------------------------------------
@@ -1190,6 +1245,17 @@ class DictionaryBuilder:
     def save_all(self):
         print("\n=== Saving Lua Dictionaries and WP JSON Databases ===")
 
+        # Safety trigger: never overwrite complete dictionaries with empty ones
+        if len(self.poe1_dict) < 5000:
+            print(f"[Error] Safety abort: PoE 1 dictionary too small ({len(self.poe1_dict)} entries < 5000). Refusing to overwrite!")
+            return False
+        if len(self.poe2_dict) < 5000:
+            print(f"[Error] Safety abort: PoE 2 dictionary too small ({len(self.poe2_dict)} entries < 5000). Refusing to overwrite!")
+            return False
+        if len(self.affix_templates) < 1000:
+            print(f"[Error] Safety abort: Affix templates table too small ({len(self.affix_templates)} entries < 1000). Refusing to overwrite!")
+            return False
+
         # 1. Lua dictionaries for PoB
         write_lua_table(os.path.join(DICT_DIR, "affix_templates.lua"), "affix_templates", self.affix_templates)
         write_lua_table(os.path.join(DICT_DIR, "poe1_ru.lua"), "poe1_ru", self.poe1_dict)
@@ -1245,7 +1311,10 @@ class DictionaryBuilder:
 
         # --- AUDIT POE 1 ---
         print("\n--- Auditing Path of Building (PoE 1) ---")
-        pob1_nodes = parse_pob_tree_nodes(os.path.join(POB1_SRC, "TreeData", "3_29", "tree.lua"))
+        audit_tree = os.path.join(POB1_SRC, "TreeData", "3_30", "tree.lua")
+        if not os.path.exists(audit_tree):
+            audit_tree = os.path.join(POB1_SRC, "TreeData", "3_29", "tree.lua")
+        pob1_nodes = parse_pob_tree_nodes(audit_tree)
         pob1_names_total = 0
         pob1_names_ok = 0
         pob1_stats_total = 0
@@ -1340,6 +1409,11 @@ class DictionaryBuilder:
 # ------------------------------------------------------------------------------
 
 def main():
+    if not os.path.isdir(POE_PARSER_DATA) and not os.environ.get("FORCE_BUILD_DICTIONARIES"):
+        print(f"[Notice] Source dataset directory {POE_PARSER_DATA} not found.")
+        print("Skipping dictionary regeneration; preserving full pre-built dictionaries in i18n/dictionaries/.")
+        sys.exit(0)
+
     builder = DictionaryBuilder()
     builder.collect_affix_templates()
     builder.build_poe1()

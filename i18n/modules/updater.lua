@@ -45,8 +45,13 @@ local function parseSimpleJSON(str)
 end
 
 function updater.init(main, launch)
-	local ver = nil
-	-- 1. Try user-updated version metadata from GetUserPath()
+	local bundledVer = nil
+	local verStatus, verTbl = pcall(require, "i18n.version")
+	if verStatus and type(verTbl) == "table" then
+		bundledVer = verTbl
+	end
+
+	local userVer = nil
 	local userDir = _G.GetUserPath and _G.GetUserPath()
 	if userDir then
 		local vf = io.open(userDir .. "/i18n/version.lua", "r")
@@ -58,22 +63,24 @@ function updater.init(main, launch)
 				if chunk then
 					local ok, tbl = pcall(chunk)
 					if ok and type(tbl) == "table" then
-						ver = tbl
+						userVer = tbl
 					end
 				end
 			end
 		end
 	end
 
-	-- 2. Fall back to packaged i18n/version.lua
-	if not ver then
-		local verStatus, verTbl = pcall(require, "i18n.version")
-		if verStatus and type(verTbl) == "table" then
-			ver = verTbl
+	-- Pick whichever version is newer by buildDate; default to bundled
+	local ver = bundledVer or {}
+	if userVer then
+		local userDate = tostring(userVer.buildDate or ""):sub(1, 10)
+		local bundleDate = tostring(ver.buildDate or ""):sub(1, 10)
+		if userDate > bundleDate then
+			ver = userVer
 		end
 	end
 
-	-- 3. Ensure defaults for all vital fields
+	-- Ensure defaults for all vital fields
 	if not ver or type(ver) ~= "table" then
 		ver = {}
 	end
@@ -143,14 +150,20 @@ function updater.checkForUpdates(main, launch, manual)
 		local localTag = isPoE2 and ver.upstreamTagPoE2 or ver.upstreamTagPoE1
 
 		local hasUpdate = false
-		if remoteGame and remoteGame.commit_short and localCommit and remoteGame.commit_short ~= localCommit then
-			hasUpdate = true
+		if remoteGame and remoteGame.commit_short and localCommit then
+			if remoteGame.commit_short:sub(1, 7) ~= localCommit:sub(1, 7) then
+				hasUpdate = true
+			end
 		end
 		if remoteGame and remoteGame.latest_release_tag and localTag and remoteGame.latest_release_tag ~= localTag then
 			hasUpdate = true
 		end
-		if data.updated_at and ver.buildDate and data.updated_at > ver.buildDate then
-			hasUpdate = true
+		if data.updated_at and ver.buildDate then
+			local remoteDate = tostring(data.updated_at):sub(1, 10)
+			local localDate = tostring(ver.buildDate):sub(1, 10)
+			if remoteDate > localDate then
+				hasUpdate = true
+			end
 		end
 
 		if hasUpdate then
